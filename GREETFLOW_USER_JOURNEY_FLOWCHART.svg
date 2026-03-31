@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="1400" viewBox="0 0 1600 1400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .title { font: bold 22px sans-serif; fill: #111; }
+      .subtitle { font: 14px sans-serif; fill: #444; }
+      .lane-label { font: bold 16px sans-serif; fill: #555; }
+      .node-user { fill: #eef4ff; stroke: #4f46e5; stroke-width: 1.5; rx: 8; }
+      .node-system { fill: #f0fdf4; stroke: #16a34a; stroke-width: 1.5; rx: 8; }
+      .node-db { fill: #fef3c7; stroke: #f59e0b; stroke-width: 1.5; rx: 8; }
+      .node-smtp { fill: #fee2e2; stroke: #ef4444; stroke-width: 1.5; rx: 8; }
+      .node-label { font: 13px sans-serif; fill: #111; }
+      .node-label-small { font: 11px sans-serif; fill: #444; }
+      .swimlane { stroke: #d4d4d8; stroke-width: 1; }
+      .swimlane-sep { stroke: #e5e7eb; stroke-width: 1; stroke-dasharray: 4 4; }
+      .arrow { stroke: #6b7280; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+      .arrow-vertical { stroke: #9ca3af; stroke-width: 1.3; fill: none; marker-end: url(#arrowhead); }
+      .legend-text { font: 12px sans-serif; fill: #4f75acff; }
+    ]]></style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="800" y="40" text-anchor="middle" class="title">GreetFlow – End-to-End User & System Journey</text>
+  <text x="800" y="65" text-anchor="middle" class="subtitle">User Flow (left) and System / Backend Flow (right)</text>
+
+  <!-- Swimlanes -->
+  <rect x="40" y="90" width="720" height="1180" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" />
+  <rect x="840" y="90" width="720" height="1180" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" />
+  
+  <text x="400" y="115" text-anchor="middle" class="lane-label">User Journey (Frontend)</text>
+  <text x="1200" y="115" text-anchor="middle" class="lane-label">System Journey (Backend, Supabase, SMTP)</text>
+
+  <!-- Horizontal separators -->
+  <line x1="40" y1="140" x2="1560" y2="140" class="swimlane-sep" />
+
+  <!-- USER FLOW NODES (left column) -->
+  <!-- Login -->
+  <rect x="120" y="170" width="520" height="70" class="node-user" />
+  <text x="380" y="195" text-anchor="middle" class="node-label">Login & Authentication</text>
+  <text x="380" y="215" text-anchor="middle" class="node-label-small">User opens /login.html, enters credentials, clicks Login</text>
+
+  <!-- Dashboard -->
+  <rect x="120" y="270" width="520" height="70" class="node-user" />
+  <text x="380" y="295" text-anchor="middle" class="node-label">Dashboard Overview</text>
+  <text x="380" y="315" text-anchor="middle" class="node-label-small">Hero, stats, upcoming events, Email Activity</text>
+
+  <!-- Users -->
+  <rect x="120" y="380" width="520" height="70" class="node-user" />
+  <text x="380" y="405" text-anchor="middle" class="node-label">Manage Users</text>
+  <text x="380" y="425" text-anchor="middle" class="node-label-small">View, search, create, edit, delete users</text>
+
+  <!-- Templates -->
+  <rect x="120" y="490" width="520" height="80" class="node-user" />
+  <text x="380" y="515" text-anchor="middle" class="node-label">Manage Templates</text>
+  <text x="380" y="535" text-anchor="middle" class="node-label-small">Browse, filter, create custom templates, generate AI templates</text>
+
+  <!-- Events -->
+  <rect x="120" y="610" width="520" height="70" class="node-user" />
+  <text x="380" y="635" text-anchor="middle" class="node-label">Manage Events</text>
+  <text x="380" y="655" text-anchor="middle" class="node-label-small">View Today / Tomorrow / This Week occasions</text>
+
+  <!-- Bulk Send / Occasion -->
+  <rect x="120" y="720" width="520" height="90" class="node-user" />
+  <text x="380" y="745" text-anchor="middle" class="node-label">Bulk Send & Occasion Greetings</text>
+  <text x="380" y="765" text-anchor="middle" class="node-label-small">Select many users, choose template, enter custom message, send</text>
+
+  <!-- Email Automation perception -->
+  <rect x="120" y="840" width="520" height="70" class="node-user" />
+  <text x="380" y="865" text-anchor="middle" class="node-label">Email Automation</text>
+  <text x="380" y="885" text-anchor="middle" class="node-label-small">User sees progress, success/failed counts</text>
+
+  <!-- Email History -->
+  <rect x="120" y="950" width="520" height="90" class="node-user" />
+  <text x="380" y="975" text-anchor="middle" class="node-label">Email Activity & History</text>
+  <text x="380" y="995" text-anchor="middle" class="node-label-small">Recent Activity tab + Email History tab with full log</text>
+
+  <!-- Analytics -->
+  <rect x="120" y="1070" width="520" height="70" class="node-user" />
+  <text x="380" y="1095" text-anchor="middle" class="node-label">Analytics & Insights</text>
+  <text x="380" y="1115" text-anchor="middle" class="node-label-small">Success rates, total emails, engagement metrics</text>
+
+  <!-- Logout -->
+  <rect x="120" y="1180" width="520" height="60" class="node-user" />
+  <text x="380" y="1205" text-anchor="middle" class="node-label">Logout</text>
+  <text x="380" y="1225" text-anchor="middle" class="node-label-small">Clears session, returns to login</text>
+
+  <!-- USER FLOW VERTICAL ARROWS -->
+  <line x1="380" y1="240" x2="380" y2="270" class="arrow-vertical" />
+  <line x1="380" y1="340" x2="380" y2="380" class="arrow-vertical" />
+  <line x1="380" y1="450" x2="380" y2="490" class="arrow-vertical" />
+  <line x1="380" y1="570" x2="380" y2="610" class="arrow-vertical" />
+  <line x1="380" y1="680" x2="380" y2="720" class="arrow-vertical" />
+  <line x1="380" y1="810" x2="380" y2="840" class="arrow-vertical" />
+  <line x1="380" y1="910" x2="380" y2="950" class="arrow-vertical" />
+  <line x1="380" y1="1040" x2="380" y2="1070" class="arrow-vertical" />
+  <line x1="380" y1="1140" x2="380" y2="1180" class="arrow-vertical" />
+
+  <!-- SYSTEM FLOW NODES (right column) -->
+  <!-- Auth -->
+  <rect x="960" y="170" width="500" height="80" class="node-system" />
+  <text x="1210" y="195" text-anchor="middle" class="node-label">Auth Endpoint & Session Check</text>
+  <text x="1210" y="215" text-anchor="middle" class="node-label-small">/api/oauth/login, localStorage.isLoggedIn guard</text>
+
+  <!-- Dashboard data fetch -->
+  <rect x="960" y="280" width="500" height="100" class="node-system" />
+  <text x="1210" y="305" text-anchor="middle" class="node-label">Dashboard Data APIs</text>
+  <text x="1210" y="325" text-anchor="middle" class="node-label-small">GET /api/users, GET /api/templates, GET /api/email-logs</text>
+
+  <!-- Users API -->
+  <rect x="960" y="410" width="500" height="90" class="node-system" />
+  <text x="1210" y="435" text-anchor="middle" class="node-label">Users API</text>
+  <text x="1210" y="455" text-anchor="middle" class="node-label-small">POST /api/users, PUT /api/users/:id, DELETE /api/users/:id</text>
+
+  <!-- Templates API -->
+  <rect x="960" y="520" width="500" height="90" class="node-system" />
+  <text x="1210" y="545" text-anchor="middle" class="node-label">Templates API</text>
+  <text x="1210" y="565" text-anchor="middle" class="node-label-small">GET /api/templates, POST /api/templates, updates & usage</text>
+
+  <!-- Events / Scheduling (logical) -->
+  <rect x="960" y="630" width="500" height="70" class="node-system" />
+  <text x="1210" y="655" text-anchor="middle" class="node-label">Events Logic</text>
+  <text x="1210" y="675" text-anchor="middle" class="node-label-small">Derives upcoming events from users & dates</text>
+
+  <!-- Email API -->
+  <rect x="960" y="730" width="500" height="90" class="node-system" />
+  <text x="1210" y="755" text-anchor="middle" class="node-label">Email API</text>
+  <text x="1210" y="775" text-anchor="middle" class="node-label-small">emailApi.sendEmail → POST /api/send-email</text>
+
+  <!-- DB nodes: Supabase -->
+  <rect x="960" y="840" width="240" height="90" class="node-db" />
+  <text x="1080" y="865" text-anchor="middle" class="node-label">Supabase DB</text>
+  <text x="1080" y="885" text-anchor="middle" class="node-label-small">people, templates, email_logs, audit_logs</text>
+
+  <!-- SMTP -->
+  <rect x="1220" y="840" width="240" height="90" class="node-smtp" />
+  <text x="1340" y="865" text-anchor="middle" class="node-label">SMTP Provider</text>
+  <text x="1340" y="885" text-anchor="middle" class="node-label-small">Gmail / SMTP – sends actual emails</text>
+
+  <!-- Email history / audit logs API -->
+  <rect x="960" y="960" width="500" height="100" class="node-system" />
+  <text x="1210" y="985" text-anchor="middle" class="node-label">Audit Logs & Email History API</text>
+  <text x="1210" y="1005" text-anchor="middle" class="node-label-small">GET /api/audit-logs/email-history, GET /api/audit-logs, GET /api/audit-logs/stats</text>
+
+  <!-- Analytics API -->
+  <rect x="960" y="1090" width="500" height="80" class="node-system" />
+  <text x="1210" y="1115" text-anchor="middle" class="node-label">Analytics API</text>
+  <text x="1210" y="1135" text-anchor="middle" class="node-label-small">GET /api/email-logs/stats and derived metrics</text>
+
+  <!-- SYSTEM FLOW VERTICAL ARROWS -->
+  <line x1="1210" y1="250" x2="1210" y2="280" class="arrow-vertical" />
+  <line x1="1210" y1="380" x2="1210" y2="410" class="arrow-vertical" />
+  <line x1="1210" y1="500" x2="1210" y2="520" class="arrow-vertical" />
+  <line x1="1210" y1="610" x2="1210" y2="630" class="arrow-vertical" />
+  <line x1="1210" y1="700" x2="1210" y2="730" class="arrow-vertical" />
+  <line x1="1210" y1="820" x2="1210" y2="840" class="arrow-vertical" />
+  <line x1="1210" y1="930" x2="1210" y2="960" class="arrow-vertical" />
+  <line x1="1210" y1="1060" x2="1210" y2="1090" class="arrow-vertical" />
+
+  <!-- CONNECTIONS BETWEEN USER AND SYSTEM FLOWS -->
+  <!-- Login → Auth Endpoint -->
+  <line x1="640" y1="205" x2="960" y2="205" class="arrow" />
+
+  <!-- Dashboard → Data APIs -->
+  <line x1="640" y1="305" x2="960" y2="305" class="arrow" />
+
+  <!-- Users UI → Users API -->
+  <line x1="640" y1="415" x2="960" y2="455" class="arrow" />
+
+  <!-- Templates UI → Templates API -->
+  <line x1="640" y1="525" x2="960" y2="565" class="arrow" />
+
+  <!-- Events UI (view) uses same data already fetched (no new arrow needed) -->
+
+  <!-- Bulk Send / Occasion → Email API -->
+  <line x1="640" y1="765" x2="960" y2="775" class="arrow" />
+
+  <!-- Email API → Supabase + SMTP -->
+  <line x1="1210" y1="775" x2="1080" y2="840" class="arrow" />
+  <line x1="1210" y1="775" x2="1340" y2="840" class="arrow" />
+
+  <!-- Supabase audit_logs / email_logs → Email History view -->
+  <line x1="640" y1="995" x2="960" y2="1010" class="arrow" />
+
+  <!-- Email History API → Supabase audit_logs -->
+  <line x1="1210" y1="1010" x2="1080" y2="930" class="arrow" />
+
+  <!-- Analytics UI → Analytics API -->
+  <line x1="640" y1="1105" x2="960" y2="1125" class="arrow" />
+
+  <!-- Analytics API → Supabase email_logs -->
+  <line x1="1210" y1="1125" x2="1080" y2="930" class="arrow" />
+
+  <!-- Legend -->
+  <rect x="40" y="1290" width="420" height="80" fill="#ffffff" stroke="#e5e7eb" />
+  <rect x="60" y="1310" width="20" height="14" class="node-user" />
+  <text x="90" y="1321" class="legend-text">User-facing step (UI)</text>
+  <rect x="60" y="1335" width="20" height="14" class="node-system" />
+  <text x="90" y="1346" class="legend-text">Backend/API step</text>
+  <rect x="260" y="1310" width="20" height="14" class="node-db" />
+  <text x="290" y="1321" class="legend-text">Supabase (DB)</text>
+  <rect x="260" y="1335" width="20" height="14" class="node-smtp" />
+  <text x="290" y="1346" class="legend-text">SMTP / Email provider</text>
+</svg>

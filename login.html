@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Greetflow | Admin Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      overflow: hidden;
+    }
+    .screen-1 {
+      background: #fff;
+      border-radius: 25px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+      padding: 3em 2em;
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5em;
+      animation: floatIn 0.8s ease forwards;
+    }
+    @keyframes floatIn {
+      from {opacity: 0; transform: translateY(40px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+    .logo-img {
+      width: 320px; /* Adjust size as needed */
+      height: auto;
+      margin-bottom: 1em;
+      border-radius: 15px; /* Optional: if you want rounded corners */
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    .logo {
+      width: 90px;
+      height: 90px;
+      background: radial-gradient(circle at center, #3d4785, #1e293b);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-weight: 700;
+      font-size: 1.2em;
+      box-shadow: 0 0 15px rgba(61,71,133,0.6);
+      letter-spacing: 1px;
+    }
+    .field {
+      width: 100%;
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 0.9em 1em;
+      display: flex;
+      align-items: center;
+      gap: 0.7em;
+      box-shadow: 0 0 1em rgba(0,0,0,0.05);
+      transition: all 0.3s ease;
+    }
+    .field:focus-within {
+      transform: scale(1.02);
+      box-shadow: 0 0 1em rgba(99,102,241,0.3);
+    }
+    .field ion-icon {
+      font-size: 1.3em;
+      color: #6366f1;
+    }
+    .field input {
+      border: none;
+      outline: none;
+      flex: 1;
+      background: transparent;
+      font-size: 0.95em;
+      color: #333;
+    }
+    .show-hide {
+      cursor: pointer;
+      color: #9ca3af;
+      transition: 0.2s;
+    }
+    .show-hide:hover {
+      color: #6366f1;
+    }
+    button.login {
+      width: 100%;
+      padding: 1em;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      border: none;
+      border-radius: 30px;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(99,102,241,0.4);
+    }
+    button.login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99,102,241,0.5);
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 0.8em;
+      color: #6b7280;
+      margin-top: 1em;
+    }
+    .footer span {
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .footer span:hover {
+      color: #6366f1;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-1">
+    <img src="assets/logo.png" alt="Greetflow Logo" class="logo-img" />
+    <div class="field">
+      <ion-icon name="mail-outline"></ion-icon>
+      <input type="email" id="email" placeholder="Email address" />
+    </div>
+    
+    <div class="field">
+      <ion-icon name="lock-closed-outline"></ion-icon>
+      <input type="password" id="password" placeholder="Password" />
+      <ion-icon name="eye-outline" class="show-hide" id="togglePassword"></ion-icon>
+    </div>
+    
+    <button class="login" id="loginButton">Login</button>
+    
+    <div class="footer">
+      <span>Forgot Password?</span>
+      <span>Help</span>
+    </div>
+  </div>
+
+  <script>
+    // Prebuilt credentials
+    const ADMIN_EMAIL = "admin@greetflow.com";
+    const ADMIN_PASS = "beamwelly123";
+
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const togglePassword = document.getElementById("togglePassword");
+    const loginButton = document.getElementById("loginButton");
+
+    togglePassword.addEventListener("click", () => {
+      const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+      passwordInput.setAttribute("type", type);
+      togglePassword.setAttribute("name", type === "password" ? "eye-outline" : "eye-off-outline");
+    });
+
+    function handleLogin() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (email === ADMIN_EMAIL && password === ADMIN_PASS) {
+        localStorage.setItem("isLoggedIn", "true");
+        // Redirect to the main page of the React app
+        window.location.href = "/"; 
+      } else {
+        alert("Invalid credentials. Please try again.");
+      }
+    }
+
+    loginButton.addEventListener('click', handleLogin);
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleLogin();
+        }
+    });
+
+    // Redirect to dashboard if already logged in
+    window.onload = () => {
+      if (localStorage.getItem("isLoggedIn") === "true") {
+        window.location.href = "/";
+      }
+    };
+  </script>
+</body>
+</html>
