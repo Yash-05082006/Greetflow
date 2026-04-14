@@ -1,48 +1,52 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const pool = require('../config/db');
 
-// POST /api/scheduler/daily - Trigger daily birthday/anniversary sweep
+// POST /api/scheduler/daily
 router.post('/daily', async (req, res) => {
-  // In a real app, this endpoint would be protected (admin/service role only)
   try {
     const today = new Date();
-    const day = today.getDate();
-    const month = today.getMonth() + 1; // JS months are 0-indexed
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
 
-    // Find people with birthdays or anniversaries today who have given consent
-    const { data: people, error: peopleError } = await supabase
-      .from('people')
-      .select('id, first_name, dob, anniversary_date')
-      .eq('consent_email', true)
-      .or(`dob.like.%-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')},anniversary_date.like.%-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+    const result = await pool.query(
+      `SELECT id, first_name, dob, anniversary_date
+       FROM people
+       WHERE consent_email = true
+       AND (
+         TO_CHAR(dob, 'MM-DD') = $1 OR
+         TO_CHAR(anniversary_date, 'MM-DD') = $1
+       )`,
+      [`${month}-${day}`]
+    );
 
-    if (peopleError) throw peopleError;
+    const people = result.rows;
 
     if (people.length === 0) {
-      return res.json({ success: true, message: 'No birthdays or anniversaries scheduled for today.' });
+      return res.json({ success: true, message: 'No events today' });
     }
 
-    // This is a simulation. We're not actually finding a template.
-    // In a real app, you'd have logic to pick an appropriate template.
-    const defaultTemplateId = 'a934a81c-1e9c-42b2-8b25-2f7af95ae493'; // Warm Professional Greeting
+    const templateId = 'a934a81c-1e9c-42b2-8b25-2f7af95ae493';
 
-    const sendsToCreate = people.map(person => ({
-      person_id: person.id,
-      template_id: defaultTemplateId,
-      status: 'queued',
-      channel: 'gmail',
-      scheduled_for: today.toISOString()
-    }));
+    const values = [];
+    const placeholders = people.map((p, i) => {
+      const base = i * 5;
+      values.push(p.id, templateId, 'queued', 'gmail', today);
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+    }).join(',');
 
-    const { data: newSends, error: sendsError } = await supabase
-      .from('sends')
-      .insert(sendsToCreate)
-      .select('id, person_id');
+    const insertResult = await pool.query(
+      `INSERT INTO sends (person_id, template_id, status, channel, scheduled_for)
+       VALUES ${placeholders}
+       RETURNING id, person_id`,
+      values
+    );
 
-    if (sendsError) throw sendsError;
-
-    res.json({ success: true, message: `Successfully queued ${newSends.length} greetings.`, data: newSends });
+    res.json({
+      success: true,
+      message: `${insertResult.rows.length} greetings queued`,
+      data: insertResult.rows
+    });
 
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

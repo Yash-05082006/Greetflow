@@ -1,74 +1,83 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const pool = require('../config/db');
 
-// GET /api/sends - List sends with filtering
+// GET sends
 router.get('/', async (req, res) => {
   try {
     const { status, campaign_id, person_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = supabase
-      .from('sends')
-      .select(`
-        id,
-        status,
-        scheduled_for,
-        sent_at,
-        error_msg,
-        channel,
-        people (id, first_name, last_name, email),
-        templates (id, name, type),
-        campaigns (id, title)
-      `, { count: 'exact' })
-      .order('scheduled_for', { ascending: false });
+    let query = `
+      SELECT s.*, 
+             p.first_name, p.last_name, p.email,
+             t.name as template_name,
+             c.title as campaign_title,
+             COUNT(*) OVER() as total
+      FROM sends s
+      LEFT JOIN people p ON s.person_id = p.id
+      LEFT JOIN templates t ON s.template_id = t.id
+      LEFT JOIN campaigns c ON s.campaign_id = c.id
+    `;
 
-    if (status) query = query.eq('status', status);
-    if (campaign_id) query = query.eq('campaign_id', campaign_id);
-    if (person_id) query = query.eq('person_id', person_id);
+    const conditions = [];
+    const values = [];
 
-    const { data, error, count } = await query.range(offset, offset + limit - 1);
+    if (status) {
+      values.push(status);
+      conditions.push(`s.status = $${values.length}`);
+    }
+    if (campaign_id) {
+      values.push(campaign_id);
+      conditions.push(`s.campaign_id = $${values.length}`);
+    }
+    if (person_id) {
+      values.push(person_id);
+      conditions.push(`s.person_id = $${values.length}`);
+    }
 
-    if (error) throw error;
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
+    }
+
+    query += ` ORDER BY s.scheduled_for DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(limit, offset);
+
+    const result = await pool.query(query, values);
+    const total = result.rows[0]?.total || 0;
 
     res.json({
       success: true,
-      data: data,
+      data: result.rows,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(count / limit),
-        totalItems: count,
-        itemsPerPage: parseInt(limit)
+        total
       }
     });
+
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/sends/retry - Retry failed sends
+// RETRY
 router.post('/retry', async (req, res) => {
   try {
     const { send_ids } = req.body;
 
-    if (!send_ids || !Array.isArray(send_ids) || send_ids.length === 0) {
-      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'send_ids must be a non-empty array.' } });
-    }
+    const result = await pool.query(
+      `UPDATE sends
+       SET status='queued', error_msg=NULL, scheduled_for=$1
+       WHERE id = ANY($2) AND status='failed'
+       RETURNING id, status`,
+      [new Date(), send_ids]
+    );
 
-    const { data, error } = await supabase
-      .from('sends')
-      .update({ 
-        status: 'queued',
-        error_msg: null,
-        scheduled_for: new Date().toISOString() // Reschedule for immediate retry
-      })
-      .in('id', send_ids)
-      .eq('status', 'failed') // Only retry sends that have actually failed
-      .select('id, status');
+    res.json({
+      success: true,
+      message: `${result.rows.length} retried`,
+      data: result.rows
+    });
 
-    if (error) throw error;
-
-    res.json({ success: true, message: `${data.length} failed sends have been re-queued for delivery.`, data });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

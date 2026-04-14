@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Send, Eye, Users, Mail, Clock, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { useDatabaseApi } from '../hooks/useDatabaseApi';
-import { Template } from '../types';
 import { emailApi } from '../services/emailApi';
-import TemplatePreview from './TemplatePreview';
-import { supabase } from '../lib/supabase';
+import { apiClient } from '../services/apiClient';
 
 interface BulkSendModalProps {
   selectedUserIds: string[];
@@ -13,23 +11,23 @@ interface BulkSendModalProps {
   onSend: () => void;
 }
 
-type TemplateSelectionType = 'default' | 'uploaded';
+type TemplateSelectionType = 'ai_generated' | 'uploaded';
 
 type UploadedTemplate = {
   id: string;
   displayName: string;
   imageUrl: string;
-  path: string;
+  templateType: 'ai_generated' | 'uploaded';
 };
 
 const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFilter, onClose, onSend }) => {
-  const { users, templates, updateTemplateUsage } = useDatabaseApi();
-  const [templateSelectionType, setTemplateSelectionType] = useState<TemplateSelectionType>('default');
-  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const { users } = useDatabaseApi();
+  const [templateSelectionType, setTemplateSelectionType] = useState<TemplateSelectionType>('ai_generated');
   const [selectedUploadedTemplate, setSelectedUploadedTemplate] = useState<UploadedTemplate | null>(null);
+  const [aiTemplates, setAiTemplates] = useState<UploadedTemplate[]>([]);
   const [uploadedTemplates, setUploadedTemplates] = useState<UploadedTemplate[]>([]);
-  const [isLoadingUploaded, setIsLoadingUploaded] = useState(false);
-  const [previewingUploadedTemplate, setPreviewingUploadedTemplate] = useState<UploadedTemplate | null>(null);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<UploadedTemplate | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [sendNow, setSendNow] = useState(true);
@@ -40,24 +38,8 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
     failed: number;
     total: number;
   } | null>(null);
-  const [previewingTemplate, setPreviewingTemplate] = useState<Template | null>(null);
 
   const selectedUsers = users.filter(user => selectedUserIds.includes(user.id));
-  const selectedTemplateData = templates.find(t => t.id === selectedTemplate);
-
-  const UPLOADED_TEMPLATES_BUCKET = 'Templates';
-  const UPLOADED_TEMPLATES_MANIFEST = 'manifest.json';
-
-  const filteredTemplates = useMemo(() => {
-    if (eventFilter === 'Birthday') {
-      return templates.filter(t => t.category === 'Birthday');
-    }
-    if (eventFilter === 'Anniversary') {
-      return templates.filter(t => t.category === 'Anniversary');
-    }
-    // Default to 'All' which shows Event Invitation and Greeting
-    return templates.filter(t => t.category === 'Event Invitation' || t.category === 'Greeting');
-  }, [templates, eventFilter]);
 
   const escapeHtml = (value: string) =>
     value
@@ -67,121 +49,35 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
-  const readUploadedTemplatesManifest = useCallback(async (): Promise<Record<string, string>> => {
+  // Load templates from backend API by type
+  const loadTemplatesByType = useCallback(async (type: TemplateSelectionType) => {
     try {
-      const { data, error } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .download(UPLOADED_TEMPLATES_MANIFEST);
-
-      if (error || !data) {
-        return {};
-      }
-
-      const text = await data.text();
-      const parsed = JSON.parse(text);
-
-      if (parsed && typeof parsed === 'object') {
-        return parsed as Record<string, string>;
-      }
-
-      return {};
-    } catch {
-      return {};
-    }
-  }, [UPLOADED_TEMPLATES_BUCKET, UPLOADED_TEMPLATES_MANIFEST]);
-
-  const loadUploadedTemplates = useCallback(async () => {
-    try {
-      setIsLoadingUploaded(true);
-
-      const { data: tableData, error: tableError } = await supabase
-        .from('uploaded_templates')
-        .select('*');
-
-      if (!tableError && Array.isArray(tableData) && tableData.length > 0) {
-        const mappedFromTable: UploadedTemplate[] = (tableData as Record<string, unknown>[]) 
-          .map((row) => {
-            const id = String(
-              row.id ?? row.path ?? row.storage_path ?? row.storageFileName ?? row.file_name ?? ''
-            );
-            const displayName = String(
-              row.display_name ?? row.displayName ?? row.name ?? row.original_name ?? 'Uploaded Template'
-            );
-            const imageUrl = String(row.image_url ?? row.imageUrl ?? row.public_url ?? row.url ?? '');
-            const path = String(row.path ?? row.storage_path ?? row.file_name ?? row.storageFileName ?? id);
-
-            return {
-              id,
-              displayName,
-              imageUrl,
-              path,
-            };
-          })
-          .filter(t => Boolean(t.id) && Boolean(t.imageUrl));
-
-        setUploadedTemplates(mappedFromTable);
-        return;
-      }
-
-      const manifest = await readUploadedTemplatesManifest();
-      const { data, error } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      const files = (data || [])
-        .filter(item => item.name !== UPLOADED_TEMPLATES_MANIFEST)
-        .filter(item => /\.(png|jpe?g)$/i.test(item.name))
-        .map(item => {
-          const { data: publicData } = supabase.storage
-            .from(UPLOADED_TEMPLATES_BUCKET)
-            .getPublicUrl(item.name);
-
-          const fallbackName = item.name.replace(/\.[^/.]+$/, '');
-          const displayName = manifest[item.name] || fallbackName;
-
-          return {
-            id: item.name,
-            displayName,
-            imageUrl: publicData.publicUrl,
-            path: item.name,
-          };
-        });
-
-      setUploadedTemplates(files);
+      setIsLoadingTemplates(true);
+      const response = await apiClient.get<any[]>('/api/uploaded-templates', { template_type: type });
+      const rows: any[] = response.data || [];
+      const mapped: UploadedTemplate[] = rows
+        .filter(r => r.image_url)
+        .map(r => ({
+          id: String(r.id),
+          displayName: String(r.display_name || r.displayName || 'Template'),
+          imageUrl: String(r.image_url),
+          templateType: r.template_type as 'ai_generated' | 'uploaded',
+        }));
+      if (type === 'ai_generated') setAiTemplates(mapped);
+      else setUploadedTemplates(mapped);
     } catch (err) {
-      console.error('Failed to load uploaded templates for bulk send:', err);
+      console.error(`Failed to load ${type} templates:`, err);
     } finally {
-      setIsLoadingUploaded(false);
+      setIsLoadingTemplates(false);
     }
-  }, [readUploadedTemplatesManifest, UPLOADED_TEMPLATES_BUCKET, UPLOADED_TEMPLATES_MANIFEST]);
+  }, []);
 
   useEffect(() => {
-    if (templateSelectionType === 'uploaded') {
-      loadUploadedTemplates();
-    }
-  }, [templateSelectionType, loadUploadedTemplates]);
+    loadTemplatesByType(templateSelectionType);
+  }, [templateSelectionType, loadTemplatesByType]);
 
-  const processTemplate = (template: Template, userName: string, message: string, preferences?: string[]) => {
-    let html = template.content;
-    html = html.replace(/\[Name\]/g, userName);
-    html = html.replace(/\[Message\]/g, message || '');
-    
-    // Add preference-based personalization if available
-    if (preferences && preferences.length > 0) {
-      const randomPreference = preferences[Math.floor(Math.random() * preferences.length)];
-      html = html.replace(/\[Preference\]/g, randomPreference);
-    }
-    
-    return html;
-  };
+  // Active template list for current tab
+  const activeTemplates = templateSelectionType === 'ai_generated' ? aiTemplates : uploadedTemplates;
 
   const generateSubject = (category: string, userName: string) => {
     const subjects: Record<string, string[]> = {
@@ -190,22 +86,14 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
       'Event Invitation': [`🎊 You're Invited, ${userName}!`, `✨ Special Invitation`],
       'Greeting': [`👋 Hello ${userName}!`, `🌟 Thinking of You`]
     };
-    
     const categorySubjects = subjects[category] || [`Hello ${userName}!`];
     return categorySubjects[Math.floor(Math.random() * categorySubjects.length)];
   };
 
   const handleSend = async () => {
-    if (templateSelectionType === 'default') {
-      if (!selectedTemplate || !selectedTemplateData) {
-        alert('Please select a template.');
-        return;
-      }
-    } else {
-      if (!selectedUploadedTemplate) {
-        alert('Please select a template.');
-        return;
-      }
+    if (!selectedUploadedTemplate) {
+      alert('Please select a template.');
+      return;
     }
 
     setIsSending(true);
@@ -214,65 +102,47 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
 
     try {
       const emailPromises = selectedUsers.map(async (user, index) => {
-        let subject = '';
-        let html = '';
+        const category = eventFilter === 'Birthday'
+          ? 'Birthday'
+          : eventFilter === 'Anniversary'
+            ? 'Anniversary'
+            : 'Greeting';
 
-        if (templateSelectionType === 'default') {
-          subject = generateSubject(selectedTemplateData!.category, user.name);
-          html = processTemplate(
-            selectedTemplateData!,
-            user.name,
-            customMessage,
-            user.preferences
-          );
-        } else {
-          const category = eventFilter === 'Birthday'
-            ? 'Birthday'
-            : eventFilter === 'Anniversary'
-              ? 'Anniversary'
-              : 'Greeting';
+        const subject = generateSubject(category, user.name);
 
-          subject = generateSubject(category, user.name);
+        const messageBlock = customMessage
+          ? `<p style="margin: 12px 0; font-size: 16px; color: #111827;">${escapeHtml(customMessage)}</p>`
+          : '';
 
-          const messageBlock = customMessage
-            ? `<p style="margin: 12px 0; font-size: 16px; color: #111827;">${escapeHtml(customMessage)}</p>`
-            : '';
-
-          html = `
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; border-collapse:collapse; background:#ffffff;">
-              <tr>
-                <td align="center" style="padding:16px;">
-                  <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px; max-width:600px; border-collapse:collapse;">
-                    <tr>
-                      <td style="font-family: Arial, sans-serif;">
-                        <p style="margin: 0 0 12px 0; font-size: 16px; color: #111827;">Hi ${escapeHtml(user.name)},</p>
-                        ${messageBlock}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding-top:16px;">
-                        <img
-                          src="${selectedUploadedTemplate!.imageUrl}"
-                          alt="${escapeHtml(selectedUploadedTemplate!.displayName)}"
-                          width="600"
-                          style="display:block; width:100%; max-width:600px; height:auto; border-radius:12px;"
-                        />
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          `;
-        }
+        const html = `
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; border-collapse:collapse; background:#ffffff;">
+            <tr>
+              <td align="center" style="padding:16px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px; max-width:600px; border-collapse:collapse;">
+                  <tr>
+                    <td style="font-family: Arial, sans-serif;">
+                      <p style="margin: 0 0 12px 0; font-size: 16px; color: #111827;">Hi ${escapeHtml(user.name)},</p>
+                      ${messageBlock}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top:16px;">
+                      <img
+                        src="${selectedUploadedTemplate.imageUrl}"
+                        alt="${escapeHtml(selectedUploadedTemplate.displayName)}"
+                        width="600"
+                        style="display:block; width:100%; max-width:600px; height:auto; border-radius:12px;"
+                      />
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        `;
 
         try {
-          await emailApi.sendEmail({
-            to: user.email,
-            name: user.name,
-            subject,
-            htmlTemplate: html
-          });
+          await emailApi.sendEmail({ to: user.email, name: user.name, subject, htmlTemplate: html });
           setSendProgress(Math.round(((index + 1) / selectedUsers.length) * 100));
           return { success: true };
         } catch (error) {
@@ -285,20 +155,14 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
 
-      if (successful > 0 && templateSelectionType === 'default') {
-        await updateTemplateUsage(selectedTemplateData!.id);
+      // Track template usage — fire once per batch, non-blocking
+      if (successful > 0 && selectedUploadedTemplate) {
+        apiClient.post(`/api/uploaded-templates/${selectedUploadedTemplate.id}/use`)
+          .catch(err => console.warn('[usage] Failed to increment usage_count:', err.message));
       }
 
-      setSendResults({
-        successful,
-        failed,
-        total: selectedUsers.length
-      });
-
-      // Auto close after showing results
-      setTimeout(() => {
-        onSend();
-      }, 3000);
+      setSendResults({ successful, failed, total: selectedUsers.length });
+      setTimeout(() => { onSend(); }, 3000);
 
     } catch (error) {
       console.error('Bulk send failed:', error);
@@ -310,9 +174,7 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
 
   // Show results screen
   if (sendResults) {
-    const selectedTemplateLabel = templateSelectionType === 'default'
-      ? selectedTemplateData?.name
-      : selectedUploadedTemplate?.displayName;
+    const selectedTemplateLabel = selectedUploadedTemplate?.displayName;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -420,125 +282,87 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
             </div>
           </div>
 
-          {/* Template Selection */}
-          <div>
-            <label className="block text-lg font-bold text-gray-900 mb-4">
-              Select Template
-            </label>
+            {/* Template Selection Tabs */}
+            <div>
+              <label className="block text-lg font-bold text-gray-900 mb-4">
+                Select Template
+              </label>
 
-            <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 mb-4">
-              <button
-                type="button"
-                onClick={() => setTemplateSelectionType('default')}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  templateSelectionType === 'default'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Default Templates
-              </button>
-              <button
-                type="button"
-                onClick={() => setTemplateSelectionType('uploaded')}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  templateSelectionType === 'uploaded'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Uploaded Templates
-              </button>
-            </div>
+              <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 mb-4">
+                <button
+                  type="button"
+                  onClick={() => { setTemplateSelectionType('ai_generated'); setSelectedUploadedTemplate(null); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    templateSelectionType === 'ai_generated'
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  AI Generated
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTemplateSelectionType('uploaded'); setSelectedUploadedTemplate(null); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    templateSelectionType === 'uploaded'
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Uploaded Templates
+                </button>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templateSelectionType === 'default' ? (
-                filteredTemplates.map(template => (
-                  <div
-                    key={template.id}
-                    onClick={() => {
-                      setSelectedTemplate(template.id);
-                      setSelectedUploadedTemplate(null);
-                    }}
-                    className={`group p-6 border-2 rounded-2xl cursor-pointer transition-all duration-300 ${
-                      selectedTemplate === template.id
-                        ? 'border-indigo-500 bg-indigo-50 shadow-lg transform scale-105'
-                        : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-bold text-gray-900 group-hover:text-indigo-700 transition-colors">{template.name}</h4>
-                        <p className="text-sm text-gray-600">{template.ageGroup}</p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewingTemplate(template);
-                        }}
-                        className="text-gray-400 hover:text-indigo-600 transition-colors p-2 hover:bg-indigo-100 rounded-lg"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full inline-block">
-                      Used {template.usageCount} times
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {isLoadingTemplates ? (
+                  <div className="col-span-full text-center py-8 text-gray-600">
+                    Loading templates...
                   </div>
-                ))
-              ) : isLoadingUploaded ? (
-                <div className="col-span-full text-center py-8 text-gray-600">
-                  Loading uploaded templates...
-                </div>
-              ) : uploadedTemplates.length === 0 ? (
-                <div className="col-span-full text-center py-8 text-gray-600">
-                  No uploaded templates available.
-                </div>
-              ) : (
-                uploadedTemplates.map(tpl => (
-                  <div
-                    key={tpl.id}
-                    onClick={() => {
-                      setSelectedUploadedTemplate(tpl);
-                      setSelectedTemplate('');
-                    }}
-                    className={`group border-2 rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${
-                      selectedUploadedTemplate?.id === tpl.id
-                        ? 'border-indigo-500 bg-indigo-50 shadow-lg transform scale-105'
-                        : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="relative h-40 w-full bg-gray-100">
-                      <img
-                        src={tpl.imageUrl}
-                        alt={tpl.displayName}
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewingUploadedTemplate(tpl);
-                        }}
-                        className="absolute top-3 right-3 p-2 bg-white/90 text-gray-700 hover:text-indigo-600 hover:bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-200"
-                        aria-label="Preview uploaded template"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="p-4">
-                      <p className="font-bold text-gray-900 truncate" title={tpl.displayName}>
-                        {tpl.displayName}
-                      </p>
-                      <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full inline-block mt-2">
-                        Uploaded
+                ) : activeTemplates.length === 0 ? (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    {templateSelectionType === 'ai_generated'
+                      ? 'No AI templates generated yet'
+                      : 'No uploaded templates available'}
+                  </div>
+                ) : (
+                  activeTemplates.map(tpl => (
+                    <div
+                      key={tpl.id}
+                      onClick={() => setSelectedUploadedTemplate(tpl)}
+                      className={`group border-2 rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${
+                        selectedUploadedTemplate?.id === tpl.id
+                          ? 'border-indigo-500 bg-indigo-50 shadow-lg transform scale-105'
+                          : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="relative h-40 w-full bg-gray-100">
+                        <img
+                          src={tpl.imageUrl}
+                          alt={tpl.displayName}
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPreviewingTemplate(tpl); }}
+                          className="absolute top-3 right-3 p-2 bg-white/90 text-gray-700 hover:text-indigo-600 hover:bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-200"
+                          aria-label="Preview template"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="p-4">
+                        <p className="font-bold text-gray-900 truncate" title={tpl.displayName}>
+                          {tpl.displayName}
+                        </p>
+                        <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full inline-block mt-2">
+                          {tpl.templateType === 'ai_generated' ? 'AI Generated' : 'Uploaded'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
 
           {/* Custom Message */}
           <div>
@@ -611,37 +435,8 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
             )}
           </div>
 
-          {/* Preview */}
-          {templateSelectionType === 'default' && selectedTemplateData && (
-            <div className="bg-gray-50 rounded-2xl p-6">
-              <h4 className="text-lg font-bold text-gray-900 mb-4">Template Preview</h4>
-              <div className="bg-white rounded-xl p-4 border-2 border-dashed border-gray-300">
-                <div 
-                  className="rounded-lg overflow-hidden"
-                  style={{ 
-                    background: selectedTemplateData.design.background,
-                    minHeight: '200px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <div 
-                    className="max-w-md"
-                    dangerouslySetInnerHTML={{ 
-                      __html: processTemplate(
-                        selectedTemplateData,
-                        '[Recipient Name]',
-                        customMessage || '[Your Custom Message]'
-                      )
-                    }} 
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {templateSelectionType === 'uploaded' && selectedUploadedTemplate && (
+          {/* Preview for selected image template */}
+          {selectedUploadedTemplate && (
             <div className="bg-gray-50 rounded-2xl p-6">
               <h4 className="text-lg font-bold text-gray-900 mb-4">Template Preview</h4>
               <div className="bg-white rounded-xl p-4 border-2 border-dashed border-gray-300">
@@ -666,9 +461,9 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
             </button>
             <button
               onClick={handleSend}
-              disabled={(templateSelectionType === 'default' ? !selectedTemplate : !selectedUploadedTemplate) || isSending}
+              disabled={!selectedUploadedTemplate || isSending}
               className={`flex items-center space-x-2 px-8 py-3 rounded-xl transition-all duration-300 font-medium ${
-                ((templateSelectionType === 'default' ? selectedTemplate : selectedUploadedTemplate) && !isSending)
+                (selectedUploadedTemplate && !isSending)
                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-700 hover:to-emerald-800 shadow-lg hover:shadow-xl transform hover:-translate-y-1'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
@@ -679,29 +474,21 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
           </div>
         </div>
       </div>
-      {previewingTemplate && (
-        <TemplatePreview
-          template={previewingTemplate}
-          onClose={() => setPreviewingTemplate(null)}
-          onSelect={() => {
-            setSelectedTemplate(previewingTemplate.id);
-            setSelectedUploadedTemplate(null);
-            setPreviewingTemplate(null);
-          }}
-        />
-      )}
 
-      {previewingUploadedTemplate && (
+      {/* Full-screen preview modal */}
+      {previewingTemplate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{previewingUploadedTemplate.displayName}</h3>
-                <p className="text-sm text-gray-500">Uploaded Template Preview</p>
+                <h3 className="text-xl font-bold text-gray-900">{previewingTemplate.displayName}</h3>
+                <p className="text-sm text-gray-500">
+                  {previewingTemplate.templateType === 'ai_generated' ? 'AI Generated Template' : 'Uploaded Template'}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setPreviewingUploadedTemplate(null)}
+                onClick={() => setPreviewingTemplate(null)}
                 className="text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-gray-50 rounded-lg"
               >
                 <X className="h-6 w-6" />
@@ -710,8 +497,8 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
             <div className="p-6 bg-gray-50">
               <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                 <img
-                  src={previewingUploadedTemplate.imageUrl}
-                  alt={previewingUploadedTemplate.displayName}
+                  src={previewingTemplate.imageUrl}
+                  alt={previewingTemplate.displayName}
                   className="w-full max-h-[70vh] object-contain"
                 />
               </div>
@@ -719,9 +506,8 @@ const BulkSendModal: React.FC<BulkSendModalProps> = ({ selectedUserIds, eventFil
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedUploadedTemplate(previewingUploadedTemplate);
-                    setSelectedTemplate('');
-                    setPreviewingUploadedTemplate(null);
+                    setSelectedUploadedTemplate(previewingTemplate);
+                    setPreviewingTemplate(null);
                   }}
                   className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                 >

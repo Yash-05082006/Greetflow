@@ -17,6 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/users', require('./routes/users')); // New users API (replaces people)
 app.use('/api/templates', require('./routes/templates'));
+app.use('/api/uploaded-templates', require('./routes/uploadedTemplates'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/email-logs', require('./routes/emailLogs')); // New email logs API
 app.use('/api/audit-logs', require('./routes/auditLogs')); // Audit logs API

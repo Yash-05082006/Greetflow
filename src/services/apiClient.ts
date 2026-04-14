@@ -49,8 +49,11 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error(`[API Error] ${endpoint}:`, data);
-        throw new Error(data.error?.message || data.message || 'API request failed');
+        console.error(`[API Error] ${endpoint} (HTTP ${response.status}):`, data);
+        const errMsg = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || data.message || `API request failed (${response.status})`);
+        throw new Error(errMsg);
       }
 
       console.log(`[API Success] ${endpoint}:`, data);
@@ -72,12 +75,36 @@ class ApiClient {
     });
   }
 
-  // POST request
+  // POST request (JSON)
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     });
+  }
+
+  // POST request (multipart/form-data — for file uploads)
+  // DO NOT set Content-Type here; the browser must compute the boundary.
+  async postFormData<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
+    const url = `${this.baseURL}${endpoint}`;
+    try {
+      console.log(`[API] POST (multipart) ${endpoint}`);
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        // No Content-Type header — browser sets it with the correct boundary
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error(`[API Error] ${endpoint}:`, data);
+        throw new Error(data.error?.message || data.error || 'Upload failed');
+      }
+      console.log(`[API Success] ${endpoint}:`, data);
+      return data;
+    } catch (error) {
+      console.error(`[API Exception] ${endpoint}:`, error);
+      throw error;
+    }
   }
 
   // PUT request

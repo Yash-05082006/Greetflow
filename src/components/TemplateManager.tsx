@@ -1,170 +1,272 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Eye, Edit, Trash2, Plus, Sparkles, Star, TrendingUp, Wand2, Upload, AlertCircle, X } from 'lucide-react';
-import { useDatabaseApi } from '../hooks/useDatabaseApi';
-import TemplatePreview from './TemplatePreview'; // Assuming this component exists and is correct
+import {
+  Eye, Trash2, Sparkles, Wand2, Upload, AlertCircle,
+  X, Download, Send, ImageIcon, Loader2, CheckCircle
+} from 'lucide-react';
+import { apiClient } from '../services/apiClient';
 import AITemplateGenerator from './AITemplateGenerator';
-import CustomTemplateCreator from './CustomTemplateCreator';
-import { supabase } from '../lib/supabase';
-import { Template } from '../types';
 
+// ────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────
+interface UploadedTemplateRecord {
+  id: string;
+  display_name: string;
+  storage_path: string;
+  image_url: string;
+  template_type: 'uploaded' | 'ai_generated';
+  created_at: string;
+}
+
+type ActiveSection = 'ai_generated' | 'uploaded';
+
+// ────────────────────────────────────────────────────────────
+// ImagePreviewModal — fullscreen preview for any image template
+// ────────────────────────────────────────────────────────────
+const ImagePreviewModal: React.FC<{
+  template: UploadedTemplateRecord;
+  onClose: () => void;
+  onDelete: () => void;
+}> = ({ template, onClose, onDelete }) => {
+  const handleDownload = () => {
+    const a = document.createElement('a');
+    a.href = template.image_url;
+    a.download = `${template.display_name.replace(/\s+/g, '_')}.png`;
+    a.target = '_blank';
+    a.click();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 truncate max-w-lg">{template.display_name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                template.template_type === 'ai_generated'
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-indigo-100 text-indigo-700'
+              }`}>
+                {template.template_type === 'ai_generated' ? <><Sparkles className="h-3 w-3" /> AI Generated</> : 'Uploaded'}
+              </span>
+              <span className="text-xs text-gray-400">
+                {new Date(template.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Image */}
+        <div className="flex-1 overflow-auto bg-gray-50 p-6 flex items-center justify-center">
+          <img
+            src={template.image_url}
+            alt={template.display_name}
+            className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-lg"
+          />
+        </div>
+
+        {/* Action bar */}
+        <div className="p-5 border-t border-gray-100 flex items-center justify-between">
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-400 rounded-xl transition-all font-medium text-sm"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all font-medium text-sm"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </button>
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-md font-medium text-sm"
+            >
+              <Send className="h-4 w-4" />
+              Use Template
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ────────────────────────────────────────────────────────────
+// TemplateCard — unified card for both AI and uploaded
+// ────────────────────────────────────────────────────────────
+const TemplateCard: React.FC<{
+  template: UploadedTemplateRecord;
+  onPreview: () => void;
+  onDelete: () => void;
+}> = ({ template, onPreview, onDelete }) => {
+  const isAI = template.template_type === 'ai_generated';
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const a = document.createElement('a');
+    a.href = template.image_url;
+    a.download = `${template.display_name.replace(/\s+/g, '_')}.png`;
+    a.target = '_blank';
+    a.click();
+  };
+
+  return (
+    <div
+      onClick={onPreview}
+      className="group bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-400 border border-gray-100 cursor-pointer transform hover:-translate-y-2"
+    >
+      {/* Image area */}
+      <div className="relative overflow-hidden h-60 bg-gray-100">
+        <img
+          src={template.image_url}
+          alt={template.display_name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+
+        {/* Hover overlay with actions */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+          <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-4 group-hover:translate-y-0 flex flex-col gap-2 w-40">
+            <button
+              onClick={(e) => { e.stopPropagation(); onPreview(); }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-gray-900 rounded-xl shadow-lg text-sm font-semibold hover:bg-gray-50 transition-all"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onPreview(); }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg text-sm font-semibold hover:bg-indigo-700 transition-all"
+            >
+              <Send className="h-4 w-4" />
+              Use
+            </button>
+            {isAI && (
+              <button
+                onClick={handleDownload}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl shadow-lg text-sm font-semibold hover:bg-emerald-700 transition-all"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Delete button — top right */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-3 right-3 p-2 bg-white/90 text-red-500 hover:text-red-700 hover:bg-white rounded-lg shadow opacity-0 group-hover:opacity-100 transition-all duration-200"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+
+        {/* AI badge — top left */}
+        {isAI && (
+          <div className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 bg-purple-600/90 backdrop-blur-sm text-white rounded-full text-xs font-bold shadow">
+            <Sparkles className="h-3 w-3" />
+            AI
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-900 truncate flex-1 mr-3" title={template.display_name}>
+          {template.display_name}
+        </p>
+        <span className={`flex-shrink-0 px-2.5 py-1 text-xs font-bold rounded-full ${
+          isAI ? 'bg-purple-50 text-purple-700' : 'bg-indigo-50 text-indigo-700'
+        }`}>
+          {isAI ? '✨ AI' : 'Uploaded'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ────────────────────────────────────────────────────────────
+// Main — TemplateManager
+// ────────────────────────────────────────────────────────────
 const TemplateManager: React.FC = () => {
-  const { templates, loading, error, addTemplate, refreshData } = useDatabaseApi();
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState('All');
-  const [templateType, setTemplateType] = useState<'default' | 'uploaded'>('default');
-  const [uploadedTemplates, setUploadedTemplates] = useState<{ id: string; name: string; displayName: string; imageUrl: string; path: string }[]>([]);
+  const [activeSection, setActiveSection] = useState<ActiveSection>('ai_generated');
+  const [aiTemplates, setAiTemplates] = useState<UploadedTemplateRecord[]>([]);
+  const [uploadedTemplates, setUploadedTemplates] = useState<UploadedTemplateRecord[]>([]);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [loadingUploaded, setLoadingUploaded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isLoadingUploaded, setIsLoadingUploaded] = useState(false);
-  const [uploadedPreview, setUploadedPreview] = useState<{ name: string; imageUrl: string } | null>(null);
-  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [previewTemplate, setPreviewTemplate] = useState<UploadedTemplateRecord | null>(null);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [showCustomCreator, setShowCustomCreator] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const UPLOADED_TEMPLATES_BUCKET = 'Templates';
-  const UPLOADED_TEMPLATES_MANIFEST = 'manifest.json';
-
-  const categories = ['All', 'Birthday', 'Anniversary', 'Event Invitation', 'Greeting'];
-  const ageGroups = ['All', 'Children (8-15)', 'Teens (15-18)', 'Adults (18+)'];
-
-  const filteredTemplates = templates.filter(template => {
-    const matchesCategory = selectedCategory === 'All' || template.category === selectedCategory;
-    const matchesAgeGroup = selectedAgeGroup === 'All' || template.ageGroup === selectedAgeGroup;
-    return matchesCategory && matchesAgeGroup;
-  });
-
-  const getAgeGroupColor = (ageGroup: string) => {
-    switch (ageGroup) {
-      case 'Children (8-15)': return 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white';
-      case 'Teens (15-18)': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
-      case 'Adults (18+)': return 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white';
-      default: return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white';
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Birthday': return 'bg-gradient-to-r from-emerald-400 to-teal-500 text-white';
-      case 'Anniversary': return 'bg-gradient-to-r from-pink-400 to-rose-500 text-white';
-      case 'Event Invitation': return 'bg-gradient-to-r from-indigo-400 to-purple-500 text-white';
-      case 'Greeting': return 'bg-gradient-to-r from-orange-400 to-red-500 text-white';
-      default: return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white';
-    }
-  };
-
-  const getPopularityIcon = (usageCount: number) => {
-    if (usageCount > 150) return <Star className="h-4 w-4 text-yellow-500" />;
-    if (usageCount > 100) return <TrendingUp className="h-4 w-4 text-green-500" />;
-    return null;
-  };
-
-  const readUploadedTemplatesManifest = useCallback(async (): Promise<Record<string, string>> => {
+  // ── Load AI Generated templates ──────────────────────────
+  const loadAITemplates = useCallback(async () => {
     try {
-      const { data, error } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .download(UPLOADED_TEMPLATES_MANIFEST);
-
-      if (error || !data) {
-        return {};
+      setLoadingAI(true);
+      setError(null);
+      const response = await apiClient.get<UploadedTemplateRecord[]>(
+        '/api/uploaded-templates',
+        { template_type: 'ai_generated' }
+      );
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to load AI templates');
       }
-
-      const text = await data.text();
-      const parsed = JSON.parse(text);
-
-      if (parsed && typeof parsed === 'object') {
-        return parsed as Record<string, string>;
-      }
-
-      return {};
-    } catch {
-      return {};
+      setAiTemplates(response.data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoadingAI(false);
     }
-  }, [UPLOADED_TEMPLATES_BUCKET, UPLOADED_TEMPLATES_MANIFEST]);
+  }, []);
 
-  const writeUploadedTemplatesManifest = useCallback(async (manifest: Record<string, string>) => {
-    const payload = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-    const bucket = supabase.storage.from(UPLOADED_TEMPLATES_BUCKET);
-
-    const { error } = await bucket.upload(UPLOADED_TEMPLATES_MANIFEST, payload, {
-      upsert: true,
-      contentType: 'application/json',
-      cacheControl: '3600',
-    });
-
-    if (!error) return;
-
-    const { error: removeError } = await bucket.remove([UPLOADED_TEMPLATES_MANIFEST]);
-    if (removeError) {
-      throw error;
-    }
-
-    const { error: retryError } = await bucket.upload(UPLOADED_TEMPLATES_MANIFEST, payload, {
-      upsert: false,
-      contentType: 'application/json',
-      cacheControl: '3600',
-    });
-
-    if (retryError) {
-      throw retryError;
-    }
-  }, [UPLOADED_TEMPLATES_BUCKET, UPLOADED_TEMPLATES_MANIFEST]);
-
+  // ── Load Uploaded templates ───────────────────────────────
   const loadUploadedTemplates = useCallback(async () => {
     try {
-      setIsLoadingUploaded(true);
-
-      const manifest = await readUploadedTemplatesManifest();
-      const { data, error } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (error) {
-        throw error;
+      setLoadingUploaded(true);
+      const response = await apiClient.get<UploadedTemplateRecord[]>(
+        '/api/uploaded-templates',
+        { template_type: 'uploaded' }
+      );
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to load uploaded templates');
       }
-
-      const files = (data || [])
-        .filter(item => item.name !== UPLOADED_TEMPLATES_MANIFEST)
-        .filter(item => /\.(png|jpe?g)$/i.test(item.name))
-        .map(item => {
-          const { data: publicData } = supabase.storage
-            .from(UPLOADED_TEMPLATES_BUCKET)
-            .getPublicUrl(item.name);
-
-          const fallbackName = item.name.replace(/\.[^/.]+$/, '');
-          const displayName = manifest[item.name] || fallbackName;
-
-          return {
-            id: item.name,
-            name: displayName,
-            displayName,
-            imageUrl: publicData.publicUrl,
-            path: item.name,
-          };
-        });
-
-      setUploadedTemplates(files);
-    } catch (err) {
-      console.error('Failed to load uploaded templates:', err);
+      setUploadedTemplates(response.data);
+    } catch (err: any) {
+      console.error('Failed to load uploaded templates:', err.message);
     } finally {
-      setIsLoadingUploaded(false);
+      setLoadingUploaded(false);
     }
-  }, [readUploadedTemplatesManifest, UPLOADED_TEMPLATES_BUCKET, UPLOADED_TEMPLATES_MANIFEST]);
+  }, []);
 
+  // Initial load
   useEffect(() => {
-    if (templateType === 'uploaded') {
-      loadUploadedTemplates();
-    }
-  }, [templateType, loadUploadedTemplates]);
+    loadAITemplates();
+    loadUploadedTemplates();
+  }, [loadAITemplates, loadUploadedTemplates]);
 
-  const handleUploadClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+  // ── AI Generator callback ─────────────────────────────────
+  const handleGenerated = (record: UploadedTemplateRecord) => {
+    setAiTemplates(prev => [record, ...prev]);
+    setShowAIGenerator(false);
+    setActiveSection('ai_generated');
   };
+
+  // ── Manual file upload ────────────────────────────────────
+  const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
@@ -177,59 +279,28 @@ const TemplateManager: React.FC = () => {
       return;
     }
 
-    const baseName = file.name.replace(/\.[^/.]+$/, '');
-    const displayName = baseName;
-    const extension = (file.name.split('.').pop() || 'png').toLowerCase();
-    const uniqueId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const storageFileName = `${Date.now()}-${uniqueId}.${extension}`;
+    const displayName = file.name.replace(/\.[^/.]+$/, '');
 
     try {
       setIsUploading(true);
-      const { error: uploadError } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .upload(storageFileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type,
-        });
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', displayName);
+      formData.append('template_type', 'uploaded');
 
-      if (uploadError) {
-        throw uploadError;
+      const response = await apiClient.postFormData<UploadedTemplateRecord>(
+        '/api/uploaded-templates/upload',
+        formData
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Upload failed');
       }
 
-      const { data: publicData } = supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .getPublicUrl(storageFileName);
-
-      try {
-        const manifest = await readUploadedTemplatesManifest();
-        manifest[storageFileName] = displayName;
-        await writeUploadedTemplatesManifest(manifest);
-      } catch (manifestErr) {
-        try {
-          await supabase.storage
-            .from(UPLOADED_TEMPLATES_BUCKET)
-            .remove([storageFileName]);
-        } catch (rollbackErr) {
-          console.error('Failed to rollback uploaded file after manifest write error:', rollbackErr);
-        }
-        throw manifestErr;
-      }
-
-      setUploadedTemplates(prev => [
-        {
-          id: storageFileName,
-          name: displayName,
-          displayName,
-          imageUrl: publicData.publicUrl,
-          path: storageFileName,
-        },
-        ...prev,
-      ]);
-    } catch (err) {
-      console.error('Failed to upload template:', err);
+      setUploadedTemplates(prev => [response.data!, ...prev]);
+      setActiveSection('uploaded');
+    } catch (err: any) {
+      console.error('Upload failed:', err);
       alert('Failed to upload template. Please try again.');
     } finally {
       setIsUploading(false);
@@ -237,295 +308,61 @@ const TemplateManager: React.FC = () => {
     }
   };
 
-  const handleDeleteUploadedTemplate = async (template: { id: string; name: string; displayName: string; imageUrl: string; path: string }) => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this template? This action cannot be undone.'
-    );
+  // ── Delete (works for both types) ─────────────────────────
+  const handleDelete = async (template: UploadedTemplateRecord) => {
+    const confirmed = window.confirm(`Delete "${template.display_name}"? This cannot be undone.`);
     if (!confirmed) return;
 
     try {
-      const { error: removeError } = await supabase.storage
-        .from(UPLOADED_TEMPLATES_BUCKET)
-        .remove([template.path]);
+      const response = await apiClient.delete(`/api/uploaded-templates/${template.id}`);
+      if (!response.success) throw new Error(response.error?.message || 'Delete failed');
 
-      if (removeError) {
-        throw removeError;
+      if (template.template_type === 'ai_generated') {
+        setAiTemplates(prev => prev.filter(t => t.id !== template.id));
+      } else {
+        setUploadedTemplates(prev => prev.filter(t => t.id !== template.id));
       }
 
-      try {
-        const manifest = await readUploadedTemplatesManifest();
-        if (manifest[template.path]) {
-          delete manifest[template.path];
-          await writeUploadedTemplatesManifest(manifest);
-        }
-      } catch (err) {
-        console.error('Failed to update uploaded templates manifest after delete:', err);
-      }
-
-      setUploadedTemplates(prev => prev.filter(t => t.path !== template.path));
-
-      if (uploadedPreview?.imageUrl === template.imageUrl) {
-        setUploadedPreview(null);
-      }
-    } catch (err) {
-      console.error('Failed to delete uploaded template:', err);
-      alert('Failed to delete template. Please try again.');
+      if (previewTemplate?.id === template.id) setPreviewTemplate(null);
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message}`);
     }
   };
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-          <h3 className="text-lg font-bold text-red-900 mb-2">Failed to Load Templates</h3>
-          <p className="text-red-700 mb-4">{error}</p>
-          <button
-            onClick={refreshData}
-            className="inline-flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300"
-          >
-            <span>Retry</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ── Helpers ───────────────────────────────────────────────
+  const currentTemplates = activeSection === 'ai_generated' ? aiTemplates : uploadedTemplates;
+  const currentLoading = activeSection === 'ai_generated' ? loadingAI : loadingUploaded;
 
   return (
     <div className="space-y-8">
-      {/* Enhanced Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 rounded-3xl p-8 text-white">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="relative z-10">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-4xl font-bold mb-3">Template Gallery</h2>
-              <p className="text-pink-100 text-xl">Create stunning, personalized messages for every occasion</p>
-            </div>
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => setShowAIGenerator(true)}
-                className="group flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-              >
-                <Wand2 className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
-                <span className="font-semibold">AI Generate</span>
-              </button>
-              <button 
-                onClick={() => setShowCustomCreator(true)}
-                className="group flex items-center space-x-2 px-6 py-3 bg-white text-purple-600 rounded-xl hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-              >
-                <Plus className="h-5 w-5 group-hover:rotate-90 transition-transform duration-300" />
-                <span className="font-semibold">New Template</span>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="absolute -top-4 -right-4 w-32 h-32 bg-white opacity-10 rounded-full"></div>
-        <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-white opacity-5 rounded-full"></div>
-      </div>
 
-      {/* Enhanced Filters */}
-      <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ── Hero Header ─────────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-violet-700 via-purple-700 to-pink-700 rounded-3xl p-8 text-white">
+        <div className="absolute inset-0 bg-black/10" />
+        {/* decorative circles */}
+        <div className="absolute -top-6 -right-6 w-40 h-40 bg-white/10 rounded-full" />
+        <div className="absolute -bottom-10 -left-10 w-52 h-52 bg-white/5 rounded-full" />
+
+        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-3">Category</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300 bg-gray-50 focus:bg-white"
-            >
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
+            <h2 className="text-4xl font-bold mb-2">Template Gallery</h2>
+            <p className="text-purple-100 text-lg">AI-generated & custom greeting card templates</p>
           </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-3">Age Group</label>
-            <select
-              value={selectedAgeGroup}
-              onChange={(e) => setSelectedAgeGroup(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300 bg-gray-50 focus:bg-white"
-            >
-              {ageGroups.map(ageGroup => (
-                <option key={ageGroup} value={ageGroup}>{ageGroup}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-3">Template Type</label>
-            <select
-              value={templateType}
-              onChange={(e) => setTemplateType(e.target.value as 'default' | 'uploaded')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300 bg-gray-50 focus:bg-white"
-            >
-              <option value="default">Default Templates</option>
-              <option value="uploaded">Uploaded Templates</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <div className="w-full bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-indigo-700">{filteredTemplates.length}</p>
-              <p className="text-sm text-indigo-600 font-medium">Templates Found</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-16">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mb-6 animate-pulse">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Templates...</h3>
-          <p className="text-gray-600">Fetching creative designs from database</p>
-        </div>
-      )}
-
-      {/* Enhanced Templates Grid */}
-      {!loading && templateType === 'default' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredTemplates.map((template) => (
-            <div key={template.id} className="group bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 border border-gray-100">
-              <div className="relative overflow-hidden">
-                <div 
-                  className="h-64 p-8 flex items-center justify-center relative cursor-pointer"
-                  style={{ background: template.design.background }}
-                  onClick={() => setPreviewTemplate(template)}
-                >
-                  <div className="text-center max-w-xs">
-                    <div 
-                      className="text-lg font-bold mb-2 opacity-90"
-                      style={{ 
-                        color: template.design.textColor,
-                        fontFamily: template.design.fontFamily 
-                      }}
-                    >
-                      {template.name}
-                    </div>
-                    <p 
-                      className="text-sm opacity-75"
-                      style={{ color: template.design.textColor }}
-                    >
-                      {template.description}
-                    </p>
-                  </div>
-                  
-                  {/* Overlay with actions */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewTemplate(template);
-                        }}
-                        className="flex items-center space-x-2 px-6 py-3 bg-white text-gray-900 rounded-xl hover:bg-gray-100 transition-all duration-200 shadow-lg font-medium"
-                      >
-                        <Eye className="h-4 w-4" />
-                        <span>Preview</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-6">
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${getCategoryColor(template.category)}`}>
-                    {template.category}
-                  </span>
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${getAgeGroupColor(template.ageGroup)}`}>
-                    {template.ageGroup}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    {getPopularityIcon(template.usageCount)}
-                    <p className="text-sm text-gray-600 font-medium">
-                      Used {template.usageCount} times
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => setPreviewTemplate(template)}
-                      className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all duration-200"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200">
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all duration-200">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State for default templates when filters return no results */}
-      {!loading && templateType === 'default' && filteredTemplates.length === 0 && (
-        <div className="text-center py-16">
-          <div className="mx-auto w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mb-6">
-            <Sparkles className="h-12 w-12 text-white" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No templates found</h3>
-          <p className="text-gray-600 mb-6">Try adjusting your filters or create a new template</p>
-          <div className="flex justify-center space-x-4">
-            <button 
-              onClick={() => setShowAIGenerator(true)}
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              <Wand2 className="h-5 w-5" />
-              <span>Generate with AI</span>
-            </button>
-            <button 
-              onClick={() => setShowCustomCreator(true)}
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Create Custom</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Uploaded Templates - client-side only */}
-      {!loading && templateType === 'uploaded' && (
-        <div>
-          {/* CTA: Create your own template */}
-          <div className="mb-4">
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-indigo-900 mb-1">Create your own template</h3>
-                <p className="text-sm text-indigo-700">
-                  Design your template in Canva, download it, and upload it here.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => window.open('https://www.canva.com/', '_blank', 'noopener,noreferrer')}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors duration-200"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Open Canva</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex justify-end mb-6">
+          <div className="flex flex-wrap gap-3">
             <button
-              type="button"
+              onClick={() => setShowAIGenerator(true)}
+              className="group flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30 rounded-xl transition-all duration-300 shadow-lg font-semibold"
+            >
+              <Wand2 className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
+              AI Generate
+            </button>
+            <button
               onClick={handleUploadClick}
               disabled={isUploading}
-              className="group inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group flex items-center gap-2 px-6 py-3 bg-white text-purple-700 hover:bg-purple-50 rounded-xl transition-all duration-300 shadow-lg font-semibold disabled:opacity-60"
             >
-              <Upload className="h-5 w-5 group-hover:translate-y-[-1px] transition-transform duration-200" />
-              <span className="font-semibold">{isUploading ? 'Uploading...' : 'Upload Template'}</span>
+              <Upload className="h-5 w-5" />
+              {isUploading ? 'Uploading...' : 'Upload'}
             </button>
             <input
               ref={fileInputRef}
@@ -535,131 +372,164 @@ const TemplateManager: React.FC = () => {
               onChange={handleFileChange}
             />
           </div>
+        </div>
+      </div>
 
-          {isLoadingUploaded ? (
-            <div className="text-center py-16">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                <Upload className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Uploaded Templates...</h3>
-              <p className="text-gray-600">Fetching templates from storage</p>
-            </div>
-          ) : uploadedTemplates.length === 0 ? (
-            <div className="text-center py-16">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No uploaded templates yet</h3>
-              <p className="text-gray-600">Upload your own designs to use them in campaigns</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {uploadedTemplates.map((template) => (
-                <div
-                  key={template.id}
-                  onClick={() => setUploadedPreview({ name: template.displayName, imageUrl: template.imageUrl })}
-                  className="group bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 border border-gray-100 cursor-pointer"
-                >
-                  <div className="relative overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteUploadedTemplate(template);
-                      }}
-                      className="absolute top-3 right-3 p-2 bg-white/90 text-red-600 hover:text-red-800 hover:bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-200"
-                      aria-label="Delete uploaded template"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <div className="h-64 w-full bg-gray-100 flex items-center justify-center">
-                      <img
-                        src={template.imageUrl}
-                        alt={template.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-semibold text-gray-900 truncate" title={template.displayName}>
-                        {template.displayName}
-                      </p>
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-600">
-                        Uploaded
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* ── Section Tabs ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-2 flex gap-2">
+        <button
+          onClick={() => setActiveSection('ai_generated')}
+          className={`flex-1 flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+            activeSection === 'ai_generated'
+              ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
+          AI Generated Templates
+          {aiTemplates.length > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              activeSection === 'ai_generated' ? 'bg-white/20' : 'bg-purple-100 text-purple-700'
+            }`}>
+              {aiTemplates.length}
+            </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveSection('uploaded')}
+          className={`flex-1 flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+            activeSection === 'uploaded'
+              ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
+        >
+          <ImageIcon className="h-4 w-4" />
+          Uploaded Templates
+          {uploadedTemplates.length > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              activeSection === 'uploaded' ? 'bg-white/20' : 'bg-indigo-100 text-indigo-700'
+            }`}>
+              {uploadedTemplates.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Error banner ─────────────────────────────────────── */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex items-center gap-3">
+          <AlertCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-800">Failed to load templates</p>
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={activeSection === 'ai_generated' ? loadAITemplates : loadUploadedTemplates}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {/* Uploaded Template Preview Modal */}
-      {uploadedPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">{uploadedPreview.name}</h3>
-                <p className="text-sm text-gray-500">Uploaded Template Preview</p>
+      {/* ── Loading state ─────────────────────────────────────── */}
+      {currentLoading && (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-purple-200">
+            <Loader2 className="h-8 w-8 text-white animate-spin" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">
+            Loading {activeSection === 'ai_generated' ? 'AI Generated' : 'Uploaded'} Templates
+          </h3>
+          <p className="text-gray-500 text-sm">Fetching from database...</p>
+        </div>
+      )}
+
+      {/* ── AI Generated: empty state ─────────────────────────── */}
+      {!currentLoading && activeSection === 'ai_generated' && aiTemplates.length === 0 && (
+        <div className="text-center py-20">
+          <div className="mx-auto w-24 h-24 bg-gradient-to-br from-violet-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-purple-200">
+            <Wand2 className="h-12 w-12 text-white" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">No AI Templates Yet</h3>
+          <p className="text-gray-500 mb-8 max-w-md mx-auto">
+            Generate your first AI-powered greeting card. Describe your vision and Gemini will create a professional, branded template in seconds.
+          </p>
+          <button
+            onClick={() => setShowAIGenerator(true)}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-violet-600 to-pink-600 text-white rounded-2xl hover:from-violet-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl font-semibold text-lg"
+          >
+            <Sparkles className="h-6 w-6" />
+            Generate First Template
+          </button>
+        </div>
+      )}
+
+      {/* ── Uploaded: Canva CTA + empty state ────────────────── */}
+      {!currentLoading && activeSection === 'uploaded' && (
+        <>
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-indigo-900">Design your own template</h3>
+              <p className="text-sm text-indigo-600 mt-0.5">Create in Canva or Figma, export as PNG/JPG, and upload here.</p>
+            </div>
+            <button
+              onClick={() => window.open('https://www.canva.com/', '_blank', 'noopener,noreferrer')}
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all"
+            >
+              <Sparkles className="h-4 w-4" />
+              Open Canva
+            </button>
+          </div>
+
+          {uploadedTemplates.length === 0 && (
+            <div className="text-center py-16">
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-full flex items-center justify-center mb-5 shadow-xl">
+                <Upload className="h-10 w-10 text-white" />
               </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">No Uploaded Templates Yet</h3>
+              <p className="text-gray-500 mb-6">Upload your own designs to use them in campaigns.</p>
               <button
-                type="button"
-                onClick={() => setUploadedPreview(null)}
-                className="text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-gray-50 rounded-lg"
+                onClick={handleUploadClick}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg font-semibold"
               >
-                <X className="h-6 w-6" />
+                <Upload className="h-5 w-5" />
+                Upload Template
               </button>
             </div>
-            <div className="p-6 bg-gray-50">
-              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <img
-                  src={uploadedPreview.imageUrl}
-                  alt={uploadedPreview.name}
-                  className="w-full max-h-[70vh] object-contain"
-                />
-              </div>
-            </div>
-          </div>
+          )}
+        </>
+      )}
+
+      {/* ── Templates Grid ────────────────────────────────────── */}
+      {!currentLoading && currentTemplates.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {currentTemplates.map(template => (
+            <TemplateCard
+              key={template.id}
+              template={template}
+              onPreview={() => setPreviewTemplate(template)}
+              onDelete={() => handleDelete(template)}
+            />
+          ))}
         </div>
       )}
 
-      {/* Modals */}
+      {/* ── Modals ───────────────────────────────────────────── */}
       {previewTemplate && (
-        <TemplatePreview
+        <ImagePreviewModal
           template={previewTemplate}
           onClose={() => setPreviewTemplate(null)}
+          onDelete={() => {
+            handleDelete(previewTemplate);
+          }}
         />
       )}
 
       {showAIGenerator && (
         <AITemplateGenerator
           onClose={() => setShowAIGenerator(false)}
-          onGenerate={async (template) => {
-            try {
-              await addTemplate(template);
-              setShowAIGenerator(false);
-            } catch (error) {
-              console.error('Failed to save AI template:', error);
-              alert('Failed to save template. Please try again.');
-            }
-          }}
-        />
-      )}
-
-      {showCustomCreator && (
-        <CustomTemplateCreator
-          onClose={() => setShowCustomCreator(false)}
-          onSave={async (template) => {
-            try {
-              await addTemplate(template);
-              setShowCustomCreator(false);
-            } catch (error) {
-              console.error('Failed to save custom template:', error);
-              alert('Failed to save template. Please try again.');
-            }
-          }}
+          onGenerated={handleGenerated}
         />
       )}
     </div>

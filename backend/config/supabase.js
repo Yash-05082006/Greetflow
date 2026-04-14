@@ -1,22 +1,16 @@
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+const pool = require('./db');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase credentials. Please check your .env file.');
-}
-
-// Create client with anon key for general operations
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Create admin client with service role key for admin operations
-const supabaseAdmin = supabaseServiceKey ? 
-  createClient(supabaseUrl, supabaseServiceKey) : null;
+// Generic query function (replacement for supabase)
+const query = async (text, params) => {
+  try {
+    const res = await pool.query(text, params);
+    return { data: res.rows, error: null };
+  } catch (err) {
+    return { data: null, error: err };
+  }
+};
 
 module.exports = {
-  supabase,
-  supabaseAdmin
+  query
 };

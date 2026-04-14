@@ -1,61 +1,42 @@
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
+const pool = require('../config/db');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-/**
- * GET /api/audit-logs
- * Fetch all audit logs with pagination and filtering
- * Query params:
- *   - page: page number (default: 1)
- *   - limit: items per page (default: 50, max: 100)
- *   - action: filter by action type
- *   - entity: filter by entity type
- *   - sort: sort order (asc/desc, default: desc)
- */
+// GET audit logs
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = (page - 1) * limit;
-    const action = req.query.action;
-    const entity = req.query.entity;
-    const sortOrder = req.query.sort === 'asc' ? 'asc' : 'desc';
+    const { action, entity } = req.query;
+    const sortOrder = req.query.sort === 'asc' ? 'ASC' : 'DESC';
 
-    // Build query
-    let query = supabase
-      .from('audit_logs')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: sortOrder === 'asc' })
-      .range(offset, offset + limit - 1);
+    let query = `SELECT *, COUNT(*) OVER() as total FROM audit_logs`;
+    const conditions = [];
+    const values = [];
 
-    // Apply filters
     if (action) {
-      query = query.eq('action', action);
+      values.push(action);
+      conditions.push(`action = $${values.length}`);
     }
+
     if (entity) {
-      query = query.eq('entity', entity);
+      values.push(entity);
+      conditions.push(`entity = $${values.length}`);
     }
 
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching audit logs:', error);
-      return res.status(500).json({
-        success: false,
-        error: {
-          message: 'Failed to fetch audit logs',
-          details: error.message
-        }
-      });
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
     }
 
-    // Transform data to include email-specific fields from meta
-    const transformedData = data.map(log => ({
+    query += ` ORDER BY created_at ${sortOrder} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(limit, offset);
+
+    const result = await pool.query(query, values);
+
+    const total = result.rows[0]?.total || 0;
+
+    const transformedData = result.rows.map(log => ({
       id: log.id,
       actor: log.actor,
       action: log.action,
@@ -75,53 +56,36 @@ router.get('/', async (req, res) => {
       pagination: {
         page,
         limit,
-        total: count,
-        totalPages: Math.ceil(count / limit)
+        total,
+        totalPages: Math.ceil(total / limit)
       }
     });
+
   } catch (error) {
     console.error('Audit logs fetch error:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Internal server error',
-        details: error.message
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-/**
- * GET /api/audit-logs/email-history
- * Fetch email-specific audit logs
- */
+// GET email history
 router.get('/email-history', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = (page - 1) * limit;
 
-    // Fetch email-related audit logs
-    const { data, error, count } = await supabase
-      .from('audit_logs')
-      .select('*', { count: 'exact' })
-      .in('action', ['email_sent', 'email_failed', 'email_scheduled', 'send_email'])
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const result = await pool.query(
+      `SELECT *, COUNT(*) OVER() as total
+       FROM audit_logs
+       WHERE action = ANY($1)
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [['email_sent', 'email_failed', 'email_scheduled', 'send_email'], limit, offset]
+    );
 
-    if (error) {
-      console.error('Error fetching email history:', error);
-      return res.status(500).json({
-        success: false,
-        error: {
-          message: 'Failed to fetch email history',
-          details: error.message
-        }
-      });
-    }
+    const total = result.rows[0]?.total || 0;
 
-    // Transform data for email history display
-    const emailHistory = data.map(log => ({
+    const emailHistory = result.rows.map(log => ({
       id: log.id,
       recipient_name: log.meta?.recipient_name || log.meta?.to || 'Unknown',
       subject: log.meta?.subject || 'No Subject',
@@ -140,91 +104,56 @@ router.get('/email-history', async (req, res) => {
       pagination: {
         page,
         limit,
-        total: count,
-        totalPages: Math.ceil(count / limit)
+        total,
+        totalPages: Math.ceil(total / limit)
       }
     });
+
   } catch (error) {
-    console.error('Email history fetch error:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Internal server error',
-        details: error.message
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-/**
- * GET /api/audit-logs/stats
- * Get audit log statistics
- */
+// GET stats
 router.get('/stats', async (req, res) => {
   try {
-    // Get total count
-    const { count: totalCount } = await supabase
-      .from('audit_logs')
-      .select('*', { count: 'exact', head: true });
-
-    // Get email-related count
-    const { count: emailCount } = await supabase
-      .from('audit_logs')
-      .select('*', { count: 'exact', head: true })
-      .in('action', ['email_sent', 'email_failed', 'email_scheduled', 'send_email']);
-
-    // Get recent activity (last 24 hours)
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count: recentCount } = await supabase
-      .from('audit_logs')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', yesterday);
+    const totalRes = await pool.query(`SELECT COUNT(*) FROM audit_logs`);
+    const emailRes = await pool.query(
+      `SELECT COUNT(*) FROM audit_logs WHERE action = ANY($1)`,
+      [['email_sent', 'email_failed', 'email_scheduled', 'send_email']]
+    );
+    const recentRes = await pool.query(
+      `SELECT COUNT(*) FROM audit_logs WHERE created_at >= $1`,
+      [new Date(Date.now() - 24 * 60 * 60 * 1000)]
+    );
 
     res.json({
       success: true,
       data: {
-        total: totalCount || 0,
-        emails: emailCount || 0,
-        recent24h: recentCount || 0
+        total: parseInt(totalRes.rows[0].count),
+        emails: parseInt(emailRes.rows[0].count),
+        recent24h: parseInt(recentRes.rows[0].count)
       }
     });
+
   } catch (error) {
-    console.error('Audit logs stats error:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to fetch statistics',
-        details: error.message
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-/**
- * GET /api/audit-logs/:id
- * Get a single audit log by ID
- */
+// GET single log
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM audit_logs WHERE id = $1`,
+      [req.params.id]
+    );
 
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({
-          success: false,
-          error: {
-            message: 'Audit log not found'
-          }
-        });
-      }
-      throw error;
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Audit log not found' });
     }
+
+    const data = result.rows[0];
 
     res.json({
       success: true,
@@ -242,15 +171,9 @@ router.get('/:id', async (req, res) => {
         created_at: data.created_at
       }
     });
+
   } catch (error) {
-    console.error('Audit log fetch error:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to fetch audit log',
-        details: error.message
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

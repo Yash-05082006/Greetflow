@@ -1,11 +1,6 @@
-const { supabase } = require('../config/supabase');
+const pool = require('../config/db');
 
 class EmailLogger {
-  /**
-   * Log email send attempt to Supabase database
-   * @param {Object} logData - Email log data
-   * @returns {Object} - Result with success status
-   */
   async logEmail(logData) {
     try {
       const { 
@@ -16,35 +11,31 @@ class EmailLogger {
         errorMessage 
       } = logData;
 
-      // Validate required fields
       if (!recipientEmail || !subject || !status) {
         throw new Error('Missing required fields: recipientEmail, subject, and status are required');
       }
 
-      // Prepare log entry
-      const logEntry = {
-        recipient_email: recipientEmail,
-        subject: subject,
-        status: status.toUpperCase(), // SENT or FAILED
-        sent_at: status.toLowerCase() === 'sent' ? new Date().toISOString() : null,
-        message_id: messageId || null,
-        error_message: errorMessage || null
-      };
+      const sentAt = status.toLowerCase() === 'sent' ? new Date() : null;
 
-      // Insert into database
-      const { data, error } = await supabase
-        .from('email_logs')
-        .insert([logEntry])
-        .select();
-
-      if (error) {
-        throw error;
-      }
+      const result = await pool.query(
+        `INSERT INTO email_logs 
+        (recipient_email, subject, status, sent_at, message_id, error_message)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id`,
+        [
+          recipientEmail,
+          subject,
+          status.toUpperCase(),
+          sentAt,
+          messageId || null,
+          errorMessage || null
+        ]
+      );
 
       return {
         success: true,
         message: 'Email log stored successfully',
-        logId: data[0]?.id
+        logId: result.rows[0]?.id
       };
 
     } catch (error) {
@@ -56,40 +47,37 @@ class EmailLogger {
     }
   }
 
-  /**
-   * Get email logs with optional filtering
-   * @param {Object} filters - Optional filters (limit, status, etc.)
-   * @returns {Object} - Result with email logs
-   */
   async getEmailLogs(filters = {}) {
     try {
       const { limit = 50, status, recipientEmail } = filters;
 
-      let query = supabase
-        .from('email_logs')
-        .select('*')
-        .order('sent_at', { ascending: false })
-        .limit(limit);
+      let query = `SELECT * FROM email_logs`;
+      const conditions = [];
+      const values = [];
 
-      // Apply filters
       if (status) {
-        query = query.eq('status', status.toUpperCase());
+        values.push(status.toUpperCase());
+        conditions.push(`status = $${values.length}`);
       }
 
       if (recipientEmail) {
-        query = query.eq('recipient_email', recipientEmail);
+        values.push(recipientEmail);
+        conditions.push(`recipient_email = $${values.length}`);
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
+      if (conditions.length > 0) {
+        query += ` WHERE ` + conditions.join(' AND ');
       }
+
+      query += ` ORDER BY sent_at DESC LIMIT $${values.length + 1}`;
+      values.push(limit);
+
+      const result = await pool.query(query, values);
 
       return {
         success: true,
-        data: data,
-        count: data.length
+        data: result.rows,
+        count: result.rows.length
       };
 
     } catch (error) {
@@ -101,20 +89,11 @@ class EmailLogger {
     }
   }
 
-  /**
-   * Get email statistics
-   * @returns {Object} - Email statistics
-   */
   async getEmailStats() {
     try {
-      // Get total counts by status
-      const { data, error } = await supabase
-        .from('email_logs')
-        .select('status');
+      const result = await pool.query(`SELECT status FROM email_logs`);
 
-      if (error) {
-        throw error;
-      }
+      const data = result.rows;
 
       const stats = {
         total: data.length,
@@ -122,12 +101,13 @@ class EmailLogger {
         failed: data.filter(log => log.status === 'FAILED').length
       };
 
-      stats.successRate = stats.total > 0 ? 
-        ((stats.sent / stats.total) * 100).toFixed(2) : '0.00';
+      stats.successRate = stats.total > 0 
+        ? ((stats.sent / stats.total) * 100).toFixed(2) 
+        : '0.00';
 
       return {
         success: true,
-        stats: stats
+        stats
       };
 
     } catch (error) {

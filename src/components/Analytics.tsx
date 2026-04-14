@@ -15,85 +15,113 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useDatabaseApi } from '../hooks/useDatabaseApi';
+import { apiClient } from '../services/apiClient';
 import { formatDate } from '../utils/dateUtils';
 
+type PopularTemplate = {
+  id: string;
+  name: string;
+  template_type: 'uploaded' | 'ai_generated';
+  usage_count: number;
+};
+
+type EmailStats = {
+  total: number;
+  success: number;
+  failed: number;
+  successRate: string;
+};
+
 const Analytics: React.FC = () => {
-  const { users, templates, emailLogs, loading, error, refreshData } = useDatabaseApi();
+  const { users, emailLogs, loading, error, refreshData } = useDatabaseApi();
   const [timeRange, setTimeRange] = useState('30'); // days
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Calculate analytics data
-  const calculateAnalytics = () => {
+  // Real data from backend
+  const [popularTemplates, setPopularTemplates] = useState<PopularTemplate[]>([]);
+  const [emailStats, setEmailStats] = useState<EmailStats>({ total: 0, success: 0, failed: 0, successRate: '0.0' });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const fetchRealStats = async (days: string) => {
+    setStatsLoading(true);
+    try {
+      const [tplRes, emailRes] = await Promise.all([
+        apiClient.get<PopularTemplate[]>('/api/analytics/popular-templates', { limit: 5 }),
+        apiClient.get<EmailStats>('/api/analytics/email-stats', { days }),
+      ]);
+      if (tplRes.data) setPopularTemplates(tplRes.data);
+      if (emailRes.data) setEmailStats(emailRes.data);
+    } catch (err) {
+      console.error('[Analytics] Failed to fetch stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRealStats(timeRange);
+  }, [timeRange]);
+
+  // Calculate user metrics from useDatabaseApi (unchanged)
+  const calculateUserMetrics = () => {
     const now = new Date();
     const rangeDate = new Date(now.getTime() - parseInt(timeRange) * 24 * 60 * 60 * 1000);
-
-    // User metrics
     const totalUsers = users.length;
-    const newUsers = users.filter(user => 
-      new Date(user.dateOfBirth) >= rangeDate
-    ).length;
-
+    const newUsers = users.filter(user => new Date(user.dateOfBirth) >= rangeDate).length;
     const usersByCategory = {
       leads: users.filter(u => u.category === 'Lead').length,
       clients: users.filter(u => u.category === 'Client').length,
-      users: users.filter(u => u.category === 'User').length
+      users: users.filter(u => u.category === 'User').length,
     };
+    return { totalUsers, newUsers, usersByCategory };
+  };
 
-    // Email metrics
-    const recentEmails = emailLogs.filter(log => 
-      new Date(log.sentAt) >= rangeDate
-    );
-
-    const emailStats = {
-      total: recentEmails.length,
-      sent: recentEmails.filter(log => log.status === 'sent').length,
-      failed: recentEmails.filter(log => log.status === 'failed').length,
-      pending: recentEmails.filter(log => log.status === 'pending').length
-    };
-
-    const successRate = emailStats.total > 0 
-      ? ((emailStats.sent / emailStats.total) * 100).toFixed(1)
-      : '0.0';
-
-    // Template usage
-    const popularTemplates = templates
-      .sort((a, b) => b.usageCount - a.usageCount)
-      .slice(0, 5);
-
-    // Daily activity (last 7 days)
-    const dailyActivity = [];
+  // Daily activity from emailLogs (unchanged)
+  const calculateDailyActivity = () => {
+    const now = new Date();
+    const daily = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       const dayEmails = emailLogs.filter(log => {
         const logDate = new Date(log.sentAt);
         return logDate.toDateString() === date.toDateString();
       }).length;
-      
-      dailyActivity.push({
+      daily.push({
         date: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        emails: dayEmails
+        emails: dayEmails,
       });
     }
-
-    return {
-      totalUsers,
-      newUsers,
-      usersByCategory,
-      emailStats,
-      successRate,
-      popularTemplates,
-      dailyActivity
-    };
+    return daily;
   };
 
-  const analytics = calculateAnalytics();
+  // Event insights — count by subject keywords (safe fallback)
+  const calculateEventInsights = () => ({
+    birthday: emailLogs.filter(l =>
+      (l.subject || '').toLowerCase().includes('birthday') ||
+      (l.templateId || '').toLowerCase().includes('birthday')
+    ).length,
+    anniversary: emailLogs.filter(l =>
+      (l.subject || '').toLowerCase().includes('anniversary') ||
+      (l.templateId || '').toLowerCase().includes('anniversary')
+    ).length,
+    custom: emailLogs.filter(l => {
+      const s = (l.subject || '').toLowerCase();
+      const t = (l.templateId || '').toLowerCase();
+      return !s.includes('birthday') && !s.includes('anniversary') &&
+             !t.includes('birthday') && !t.includes('anniversary');
+    }).length,
+  });
+
+  const userMetrics = calculateUserMetrics();
+  const dailyActivity = calculateDailyActivity();
+  const eventInsights = calculateEventInsights();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await refreshData();
-    } catch (error) {
-      console.error('Failed to refresh analytics:', error);
+      await Promise.all([refreshData(), fetchRealStats(timeRange)]);
+    } catch (err) {
+      console.error('Failed to refresh analytics:', err);
     } finally {
       setIsRefreshing(false);
     }
@@ -155,8 +183,8 @@ const Analytics: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Total Users</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.totalUsers}</p>
-              <p className="text-sm text-emerald-600 font-medium">+{analytics.newUsers} this period</p>
+              <p className="text-3xl font-bold text-gray-900">{userMetrics.totalUsers}</p>
+              <p className="text-sm text-emerald-600 font-medium">+{userMetrics.newUsers} this period</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
               <Users className="h-8 w-8 text-white" />
@@ -168,7 +196,7 @@ const Analytics: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Messages Sent</p>
-              <p className="text-3xl font-bold text-gray-900">{analytics.emailStats.sent}</p>
+              <p className="text-3xl font-bold text-gray-900">{statsLoading ? '…' : emailStats.success}</p>
               <p className="text-sm text-purple-600 font-medium">Last {timeRange} days</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
@@ -181,7 +209,7 @@ const Analytics: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Success Rate</p>
-              <p className="text-3xl font-bold text-emerald-600">{analytics.successRate}%</p>
+              <p className="text-3xl font-bold text-emerald-600">{statsLoading ? '…' : emailStats.successRate}%</p>
               <p className="text-sm text-emerald-600 font-medium">Delivery rate</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
@@ -194,7 +222,7 @@ const Analytics: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Failed Emails</p>
-              <p className="text-3xl font-bold text-red-600">{analytics.emailStats.failed}</p>
+              <p className="text-3xl font-bold text-red-600">{statsLoading ? '…' : emailStats.failed}</p>
               <p className="text-sm text-red-600 font-medium">Need attention</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl group-hover:scale-110 transition-transform duration-300">
@@ -227,9 +255,9 @@ const Analytics: React.FC = () => {
                   <span className="font-medium text-gray-900">Clients</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-blue-600">{analytics.usersByCategory.clients}</span>
+                  <span className="text-2xl font-bold text-blue-600">{userMetrics.usersByCategory.clients}</span>
                   <p className="text-sm text-gray-600">
-                    {analytics.totalUsers > 0 ? Math.round((analytics.usersByCategory.clients / analytics.totalUsers) * 100) : 0}%
+                    {userMetrics.totalUsers > 0 ? Math.round((userMetrics.usersByCategory.clients / userMetrics.totalUsers) * 100) : 0}%
                   </p>
                 </div>
               </div>
@@ -240,9 +268,9 @@ const Analytics: React.FC = () => {
                   <span className="font-medium text-gray-900">Leads</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-amber-600">{analytics.usersByCategory.leads}</span>
+                  <span className="text-2xl font-bold text-amber-600">{userMetrics.usersByCategory.leads}</span>
                   <p className="text-sm text-gray-600">
-                    {analytics.totalUsers > 0 ? Math.round((analytics.usersByCategory.leads / analytics.totalUsers) * 100) : 0}%
+                    {userMetrics.totalUsers > 0 ? Math.round((userMetrics.usersByCategory.leads / userMetrics.totalUsers) * 100) : 0}%
                   </p>
                 </div>
               </div>
@@ -253,9 +281,9 @@ const Analytics: React.FC = () => {
                   <span className="font-medium text-gray-900">Users</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-emerald-600">{analytics.usersByCategory.users}</span>
+                  <span className="text-2xl font-bold text-emerald-600">{userMetrics.usersByCategory.users}</span>
                   <p className="text-sm text-gray-600">
-                    {analytics.totalUsers > 0 ? Math.round((analytics.usersByCategory.users / analytics.totalUsers) * 100) : 0}%
+                    {userMetrics.totalUsers > 0 ? Math.round((userMetrics.usersByCategory.users / userMetrics.totalUsers) * 100) : 0}%
                   </p>
                 </div>
               </div>
@@ -278,8 +306,8 @@ const Analytics: React.FC = () => {
           </div>
           <div className="p-6">
             <div className="space-y-3">
-              {analytics.dailyActivity.map((day, index) => {
-                const maxEmails = Math.max(...analytics.dailyActivity.map(d => d.emails));
+              {dailyActivity.map((day, index) => {
+                const maxEmails = Math.max(...dailyActivity.map(d => d.emails));
                 const percentage = maxEmails > 0 ? (day.emails / maxEmails) * 100 : 0;
                 
                 return (
@@ -321,7 +349,7 @@ const Analytics: React.FC = () => {
               <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="h-8 w-8 text-white" />
               </div>
-              <p className="text-3xl font-bold text-emerald-600 mb-2">{analytics.emailStats.sent}</p>
+              <p className="text-3xl font-bold text-emerald-600 mb-2">{statsLoading ? '…' : emailStats.success}</p>
               <p className="text-sm font-medium text-emerald-700">Successfully Sent</p>
             </div>
             
@@ -329,7 +357,7 @@ const Analytics: React.FC = () => {
               <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="h-8 w-8 text-white" />
               </div>
-              <p className="text-3xl font-bold text-red-600 mb-2">{analytics.emailStats.failed}</p>
+              <p className="text-3xl font-bold text-red-600 mb-2">{statsLoading ? '…' : emailStats.failed}</p>
               <p className="text-sm font-medium text-red-700">Failed Deliveries</p>
             </div>
             
@@ -337,8 +365,8 @@ const Analytics: React.FC = () => {
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Clock className="h-8 w-8 text-white" />
               </div>
-              <p className="text-3xl font-bold text-blue-600 mb-2">{analytics.emailStats.pending}</p>
-              <p className="text-sm font-medium text-blue-700">Pending</p>
+              <p className="text-3xl font-bold text-blue-600 mb-2">{statsLoading ? '…' : emailStats.total}</p>
+              <p className="text-sm font-medium text-blue-700">Total Sent</p>
             </div>
           </div>
         </div>
@@ -359,29 +387,37 @@ const Analytics: React.FC = () => {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            {analytics.popularTemplates.map((template, index) => (
-              <div key={template.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    {index + 1}
+            {statsLoading ? (
+              <p className="text-center text-gray-500 py-4">Loading...</p>
+            ) : popularTemplates.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">No templates used yet</p>
+            ) : (
+              popularTemplates.map((template, index) => (
+                <div key={template.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{template.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {template.template_type === 'ai_generated' ? 'AI Generated' : 'Uploaded'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{template.name}</p>
-                    <p className="text-sm text-gray-600">{template.category} • {template.ageGroup}</p>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-gray-900">{template.usage_count}</p>
+                    <p className="text-sm text-gray-600">uses</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-gray-900">{template.usageCount}</p>
-                  <p className="text-sm text-gray-600">uses</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* Failed Deliveries Log */}
-      {analytics.emailStats.failed > 0 && (
+      {emailStats.failed > 0 && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-red-500 to-pink-500 p-6 text-white">
             <div className="flex items-center space-x-3">
@@ -395,8 +431,8 @@ const Analytics: React.FC = () => {
             </div>
           </div>
           <div className="p-6">
-            <div className="space-y-3">
-              {emailLogs
+            <div className="space-y-4">
+              {analytics.emailStats.failed > 0 && emailLogs
                 .filter(log => log.status === 'failed')
                 .slice(0, 10)
                 .map((log, index) => {
@@ -437,21 +473,15 @@ const Analytics: React.FC = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-700 font-medium">Birthday Events</span>
-                <span className="text-xl font-bold text-yellow-600">
-                  {emailLogs.filter(log => log.templateId?.includes('birthday')).length}
-                </span>
+                <span className="text-xl font-bold text-yellow-600">{eventInsights.birthday}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-700 font-medium">Anniversary Events</span>
-                <span className="text-xl font-bold text-pink-600">
-                  {emailLogs.filter(log => log.templateId?.includes('anniversary')).length}
-                </span>
+                <span className="text-xl font-bold text-pink-600">{eventInsights.anniversary}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-700 font-medium">Custom Events</span>
-                <span className="text-xl font-bold text-purple-600">
-                  {emailLogs.filter(log => log.templateId?.includes('greeting') || log.templateId?.includes('invitation')).length}
-                </span>
+                <span className="text-xl font-bold text-purple-600">{eventInsights.custom}</span>
               </div>
             </div>
           </div>
