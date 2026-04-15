@@ -10,6 +10,36 @@ import Analytics from './components/Analytics';
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  // ── Auth state ──────────────────────────────────────────────────────────────
+  // Read initial state from localStorage so a hard-refresh keeps the session.
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem('isLoggedIn') === 'true'
+  );
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    // Credentials can be overridden via Vite env vars without touching this file.
+    const validEmail = import.meta.env.VITE_LOGIN_EMAIL || 'admin@greetflow.com';
+    const validPassword = import.meta.env.VITE_LOGIN_PASSWORD || 'greetflow2024';
+    if (loginEmail.trim() === validEmail && loginPassword === validPassword) {
+      localStorage.setItem('isLoggedIn', 'true');
+      setIsLoggedIn(true);
+    } else {
+      setLoginError('Invalid email or password. Please try again.');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    setIsLoggedIn(false);
+    setLoginEmail('');
+    setLoginPassword('');
+  };
+
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, gradient: 'from-blue-500 to-cyan-500' },
     { id: 'users', name: 'Users', icon: Users, gradient: 'from-emerald-500 to-teal-500' },
@@ -22,7 +52,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onLogout={handleLogout} />;
       case 'users':
         return <UserManagement />;
       case 'templates':
@@ -34,13 +64,74 @@ function App() {
       case 'settings':
         return <SettingsPanel />;
       default:
-        return <Dashboard />;
+        return <Dashboard onLogout={handleLogout} />;
     }
   };
 
+  // ── Login screen (shown when isLoggedIn is false) ───────────────────────────
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-10">
+          <div className="text-center mb-8">
+            <div className="inline-flex p-4 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl shadow-lg mb-4">
+              <Bell className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              GreetFlow
+            </h1>
+            <p className="text-gray-500 mt-1">Business Automation Platform</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+              <input
+                id="login-email"
+                type="email"
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                required
+                autoComplete="email"
+                placeholder="admin@greetflow.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 outline-none"
+              />
+            </div>
+            {loginError && (
+              <p className="text-sm text-red-600 font-medium bg-red-50 px-4 py-2 rounded-lg border border-red-200">
+                {loginError}
+              </p>
+            )}
+            <button
+              id="login-submit"
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              Sign In
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main app (shown when isLoggedIn is true) ────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-      {/* Enhanced Header */}
+      {/* Header */}
       <header className="bg-white shadow-xl border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
@@ -71,7 +162,7 @@ function App() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Enhanced Sidebar Navigation */}
+          {/* Sidebar Navigation */}
           <div className="lg:w-80 flex-shrink-0">
             <nav className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 sticky top-32">
               <div className="mb-6">
@@ -93,8 +184,8 @@ function App() {
                         }`}
                       >
                         <div className={`p-2 rounded-lg mr-4 transition-all duration-300 ${
-                          isActive 
-                            ? 'bg-white bg-opacity-20' 
+                          isActive
+                            ? 'bg-white bg-opacity-20'
                             : 'bg-gray-100 group-hover:bg-gray-200'
                         }`}>
                           <Icon className={`h-5 w-5 ${
@@ -110,7 +201,7 @@ function App() {
                   );
                 })}
               </ul>
-              
+
               {/* Navigation Footer */}
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">

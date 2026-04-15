@@ -16,7 +16,7 @@ type EmailHistoryRow = {
 
 type RecentActivityRange = '24h' | '48h' | '7d';
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const { users, emailLogs, loading, error, getUpcomingEvents, refreshData } = useDatabaseApi();
   const upcomingEvents = getUpcomingEvents();
   
@@ -55,9 +55,9 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (localStorage.getItem('isLoggedIn') !== 'true') {
-      window.location.href = '/login.html';
+      onLogout();
     }
-  }, []);
+  }, [onLogout]);
 
   const PAGE_SIZE = 20;
   const RECENT_LIMIT = 10;
@@ -258,7 +258,7 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
-    window.location.href = '/login.html';
+    onLogout();
   };
 
 
