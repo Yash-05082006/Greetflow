@@ -3,7 +3,8 @@
  * Centralized HTTP client for all backend API communications
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL: string = import.meta.env.VITE_API_URL as string;
+
 
 interface ApiResponse<T> {
   success: boolean;
