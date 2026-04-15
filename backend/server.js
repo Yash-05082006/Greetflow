@@ -9,10 +9,19 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(helmet());
-app.use(cors());
+// CORS must be registered BEFORE helmet and all routes
+// so preflight OPTIONS requests are handled correctly.
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+}));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
 
 // Routes
 app.use('/api/users', require('./routes/users')); // New users API (replaces people)
