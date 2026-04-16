@@ -200,7 +200,7 @@ const AITemplateGenerator: React.FC<AITemplateGeneratorProps> = ({ onClose, onGe
       await new Promise(r => setTimeout(r, 800));
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Generation failed. Please try again.');
+        throw new Error(response.message || response.error?.message || 'Generation failed. Please try again.');
       }
 
       setGeneratedRecord(response.data);
@@ -240,7 +240,7 @@ const AITemplateGenerator: React.FC<AITemplateGeneratorProps> = ({ onClose, onGe
               </div>
               <div>
                 <h3 className="text-2xl font-bold">AI Template Generator</h3>
-                <p className="text-purple-100 text-sm mt-0.5">Powered by Google Gemini · Beam Welly branded</p>
+                <p className="text-purple-100 text-sm mt-0.5">Powered by Stable Diffusion · Beam Welly branded</p>
               </div>
             </div>
             <button
@@ -320,13 +320,10 @@ const AITemplateGenerator: React.FC<AITemplateGeneratorProps> = ({ onClose, onGe
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-gray-50 focus:bg-white resize-none"
                   placeholder="Describe the greeting card in detail — theme, colors, mood, style, any special elements..."
                 />
-                <div className="flex justify-between mt-1.5">
+                <div className="mt-1.5">
                   <p className="text-xs text-gray-500">
                     💡 More detail = better results. Describe colors, mood, style, and any special elements.
                   </p>
-                  <span className={`text-xs font-medium ${prompt.length > 800 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {prompt.length}/1000
-                  </span>
                 </div>
               </div>
 
@@ -397,7 +394,7 @@ const AITemplateGenerator: React.FC<AITemplateGeneratorProps> = ({ onClose, onGe
                   {STEP_MESSAGES[generatingStep]}
                 </h3>
                 <p className="text-gray-500 text-sm max-w-sm">
-                  Gemini is creating your bespoke greeting card. This takes 15–30 seconds.
+                  Stable Diffusion is generating your greeting card. This may take up to 90 seconds.
                 </p>
               </div>
 

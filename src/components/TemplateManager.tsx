@@ -453,7 +453,7 @@ const TemplateManager: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-gray-900 mb-3">No AI Templates Yet</h3>
           <p className="text-gray-500 mb-8 max-w-md mx-auto">
-            Generate your first AI-powered greeting card. Describe your vision and Gemini will create a professional, branded template in seconds.
+            Generate your first AI-powered greeting card. Describe your vision and our Stable Diffusion model will create a professional, branded template in seconds.
           </p>
           <button
             onClick={() => setShowAIGenerator(true)}
