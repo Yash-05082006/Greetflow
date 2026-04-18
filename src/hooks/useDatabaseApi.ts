@@ -53,7 +53,7 @@ export const useDatabaseApi = () => {
   const addUser = async (userData: Omit<User, 'id'>) => {
     try {
       const newUser = await usersApi.create(userData);
-      setUsers(prev => [newUser, ...prev]);
+      setUsers(prev => [...prev, newUser]);
       return newUser;
     } catch (err) {
       console.error('Failed to add user:', err);

@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
     const result = await pool.query(
       `SELECT *
        FROM users
-       ORDER BY created_at DESC, COALESCE(import_order, 0) ASC`
+       ORDER BY created_at ASC, COALESCE(import_order, 0) ASC`
     );
 
     res.json({
@@ -294,13 +294,13 @@ router.post('/import', upload.single('file'), async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, phone, category, date_of_birth, anniversary_date, preferences } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO users (name, email)
-       VALUES ($1, $2)
+      `INSERT INTO users (name, email, phone, category, date_of_birth, anniversary_date, preferences)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [name, email]
+      [name, email, phone, category, date_of_birth, anniversary_date, preferences ? `{${preferences.join(',')}}` : null]
     );
 
     res.json({ success: true, data: result.rows[0] });
@@ -314,9 +314,22 @@ router.post('/', async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 router.put('/:id', async (req, res) => {
   try {
+    const { name, email, phone, category, date_of_birth, anniversary_date, preferences } = req.body;
+    
     const result = await pool.query(
-      `UPDATE users SET name=$1, email=$2 WHERE id=$3 RETURNING *`,
-      [req.body.name, req.body.email, req.params.id]
+      `UPDATE users 
+       SET name=$1, email=$2, phone=$3, category=$4, date_of_birth=$5, anniversary_date=$6, preferences=$7 
+       WHERE id=$8 RETURNING *`,
+      [
+        name, 
+        email, 
+        phone, 
+        category, 
+        date_of_birth, 
+        anniversary_date, 
+        preferences ? `{${preferences.join(',')}}` : null, 
+        req.params.id
+      ]
     );
 
     res.json({ success: true, data: result.rows[0] });
