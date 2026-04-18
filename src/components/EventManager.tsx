@@ -148,54 +148,54 @@ const EventManager: React.FC = () => {
 
       {/* Enhanced Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Upcoming Events</p>
-              <p className="text-3xl font-bold text-gray-900">{upcomingEvents.length}</p>
-              <p className="text-sm text-emerald-600 font-medium">Next 30 days</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Upcoming Events</p>
+              <p className="text-2xl font-bold text-gray-900">{upcomingEvents.length}</p>
+              <p className="text-xs text-emerald-600 font-medium mt-1">Next 30 days</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Calendar className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+              <Calendar className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Templates</p>
-              <p className="text-3xl font-bold text-gray-900">{templates.length}</p>
-              <p className="text-sm text-blue-600 font-medium">Ready to use</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Templates</p>
+              <p className="text-2xl font-bold text-gray-900">{templates.length}</p>
+              <p className="text-xs text-blue-600 font-medium mt-1">Ready to use</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Mail className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+              <Mail className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Selected Users</p>
-              <p className="text-3xl font-bold text-gray-900">{selectedUsers.length}</p>
-              <p className="text-sm text-purple-600 font-medium">For bulk send</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Selected Users</p>
+              <p className="text-2xl font-bold text-gray-900">{selectedUsers.length}</p>
+              <p className="text-xs text-purple-600 font-medium mt-1">For bulk send</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Users className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+              <Users className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Success Rate</p>
-              <p className="text-3xl font-bold text-gray-900">98.5%</p>
-              <p className="text-sm text-orange-600 font-medium">Delivery rate</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Success Rate</p>
+              <p className="text-2xl font-bold text-gray-900">98.5%</p>
+              <p className="text-xs text-orange-600 font-medium mt-1">Delivery rate</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Target className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-orange-500 to-red-500 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+              <Target className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>

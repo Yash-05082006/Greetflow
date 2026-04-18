@@ -5,6 +5,8 @@
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL as string;
 
+console.log('[apiClient] FINAL API BASE URL:', API_BASE_URL);
+
 
 interface ApiResponse<T> {
   success: boolean;
@@ -121,6 +123,17 @@ class ApiClient {
     return this.request<T>(endpoint, {
       method: 'DELETE',
     });
+  }
+
+  // GET binary file (for downloads — returns a Blob)
+  async getBlob(endpoint: string): Promise<Blob> {
+    const url = `${this.baseURL}${endpoint}`;
+    console.log(`[API] GET (blob) ${endpoint}`);
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) {
+      throw new Error(`Download failed: HTTP ${response.status}`);
+    }
+    return response.blob();
   }
 }
 

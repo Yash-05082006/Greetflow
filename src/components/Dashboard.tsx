@@ -434,21 +434,13 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             return (
               <button
                 key={index}
-                className="group p-6 rounded-xl border-2 border-gray-200 hover:border-transparent transition-all duration-300 hover:shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, transparent 0%, transparent 100%)`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `linear-gradient(135deg, ${action.color.split(' ')[1]} 0%, ${action.color.split(' ')[3]} 100%)`;
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
+                className="group relative p-6 rounded-xl border-2 border-gray-200 hover:border-transparent transition-all duration-300 hover:shadow-xl hover:scale-[1.03] overflow-hidden bg-white"
               >
-                <Icon className="h-8 w-8 mx-auto mb-3 text-gray-600 group-hover:text-white transition-colors" />
-                <p className="font-semibold text-gray-900 group-hover:text-white transition-colors">{action.title}</p>
+                <div className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <Icon className="h-8 w-8 mb-3 text-gray-600 group-hover:text-white transition-colors duration-300" />
+                  <p className="font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{action.title}</p>
+                </div>
               </button>
             );
           })}
@@ -613,30 +605,6 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         </div>
       </div>
 
-      {/* Quick Actions Grid */}
-      <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-        <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={index}
-                className="group p-6 rounded-xl border-2 border-gray-200 hover:border-transparent transition-all duration-300 hover:shadow-lg relative overflow-hidden"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `linear-gradient(135deg, ${action.color.split(' ')[1]} 0%, ${action.color.split(' ')[3]} 100%)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'white';
-                }}
-              >
-                <Icon className="h-8 w-8 mx-auto mb-3 text-gray-600 group-hover:text-white transition-colors duration-300" />
-                <p className="font-semibold text-gray-900 group-hover:text-white transition-colors duration-300">{action.title}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Email Activity Section with Tabs */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100">

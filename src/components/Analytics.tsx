@@ -179,54 +179,54 @@ const Analytics: React.FC = () => {
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Total Users</p>
-              <p className="text-3xl font-bold text-gray-900">{userMetrics.totalUsers}</p>
-              <p className="text-sm text-emerald-600 font-medium">+{userMetrics.newUsers} this period</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Total Users</p>
+              <p className="text-2xl font-bold text-gray-900">{userMetrics.totalUsers}</p>
+              <p className="text-xs text-emerald-600 font-medium mt-1">+{userMetrics.newUsers} this period</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Users className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0">
+              <Users className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Messages Sent</p>
-              <p className="text-3xl font-bold text-gray-900">{statsLoading ? '…' : emailStats.success}</p>
-              <p className="text-sm text-purple-600 font-medium">Last {timeRange} days</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Messages Sent</p>
+              <p className="text-2xl font-bold text-gray-900">{statsLoading ? '…' : emailStats.success}</p>
+              <p className="text-xs text-purple-600 font-medium mt-1">Last {timeRange} days</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <Mail className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0">
+              <Mail className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Success Rate</p>
-              <p className="text-3xl font-bold text-emerald-600">{statsLoading ? '…' : emailStats.successRate}%</p>
-              <p className="text-sm text-emerald-600 font-medium">Delivery rate</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Success Rate</p>
+              <p className="text-2xl font-bold text-emerald-600">{statsLoading ? '…' : emailStats.successRate}%</p>
+              <p className="text-xs text-emerald-600 font-medium mt-1">Delivery rate</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <TrendingUp className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0">
+              <TrendingUp className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100">
-          <div className="flex items-center justify-between">
+        <div className="group bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Failed Emails</p>
-              <p className="text-3xl font-bold text-red-600">{statsLoading ? '…' : emailStats.failed}</p>
-              <p className="text-sm text-red-600 font-medium">Need attention</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Failed Emails</p>
+              <p className="text-2xl font-bold text-red-600">{statsLoading ? '…' : emailStats.failed}</p>
+              <p className="text-xs text-red-600 font-medium mt-1">Need attention</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-              <AlertTriangle className="h-8 w-8 text-white" />
+            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-red-500 to-orange-500 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0">
+              <AlertTriangle className="h-6 w-6 text-white" />
             </div>
           </div>
         </div>
@@ -345,28 +345,40 @@ const Analytics: React.FC = () => {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-6 bg-emerald-50 rounded-2xl">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-8 w-8 text-white" />
+            <div className="group bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Successfully Sent</p>
+                  <p className="text-2xl font-bold text-emerald-600">{statsLoading ? '…' : emailStats.success}</p>
+                </div>
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <p className="text-3xl font-bold text-emerald-600 mb-2">{statsLoading ? '…' : emailStats.success}</p>
-              <p className="text-sm font-medium text-emerald-700">Successfully Sent</p>
             </div>
             
-            <div className="text-center p-6 bg-red-50 rounded-2xl">
-              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="h-8 w-8 text-white" />
+            <div className="group bg-white border border-red-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Failed Deliveries</p>
+                  <p className="text-2xl font-bold text-red-600">{statsLoading ? '…' : emailStats.failed}</p>
+                </div>
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+                  <AlertTriangle className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <p className="text-3xl font-bold text-red-600 mb-2">{statsLoading ? '…' : emailStats.failed}</p>
-              <p className="text-sm font-medium text-red-700">Failed Deliveries</p>
             </div>
             
-            <div className="text-center p-6 bg-blue-50 rounded-2xl">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-white" />
+            <div className="group bg-white border border-blue-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sent</p>
+                  <p className="text-2xl font-bold text-blue-600">{statsLoading ? '…' : emailStats.total}</p>
+                </div>
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0 shadow-sm">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <p className="text-3xl font-bold text-blue-600 mb-2">{statsLoading ? '…' : emailStats.total}</p>
-              <p className="text-sm font-medium text-blue-700">Total Sent</p>
             </div>
           </div>
         </div>
